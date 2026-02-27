@@ -10,7 +10,7 @@ namespace LnBot;
 /// <summary>
 /// The official .NET client for the LnBot API.
 /// </summary>
-public sealed class LnBotClient : IDisposable
+public sealed class LnBotClient : ILnBotClient
 {
     internal const string Version = "0.4.0";
     internal static readonly string DefaultBaseUrl = "https://api.ln.bot";
