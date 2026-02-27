@@ -143,6 +143,32 @@ using var client = new LnBotClient("key_...", new LnBotClientOptions
 
 ---
 
+## L402 paywalls
+
+```csharp
+// Create a challenge (server side)
+var challenge = await client.L402.CreateChallengeAsync(new CreateL402ChallengeRequest
+{
+    Amount = 100,
+    Description = "API access",
+    ExpirySeconds = 3600,
+});
+
+// Pay the challenge (client side)
+var result = await client.L402.PayAsync(new PayL402Request
+{
+    WwwAuthenticate = challenge.WwwAuthenticate,
+});
+
+// Verify a token (server side, stateless)
+var v = await client.L402.VerifyAsync(new VerifyL402Request
+{
+    Authorization = result.Authorization!,
+});
+```
+
+---
+
 ## Features
 
 - **Zero dependencies** — `System.Net.Http` + `System.Text.Json` only

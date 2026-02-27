@@ -28,6 +28,9 @@ public interface ILnBotClient : IDisposable
     /// <summary>API key management.</summary>
     KeysResource Keys { get; }
 
+    /// <summary>L402 paywall authentication.</summary>
+    L402Resource L402 { get; }
+
     /// <summary>Real-time event stream.</summary>
     EventsResource Events { get; }
 

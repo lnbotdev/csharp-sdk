@@ -12,7 +12,7 @@ namespace LnBot;
 /// </summary>
 public sealed class LnBotClient : ILnBotClient
 {
-    internal const string Version = "0.4.0";
+    internal const string Version = "0.5.0";
     internal static readonly string DefaultBaseUrl = "https://api.ln.bot";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -45,6 +45,9 @@ public sealed class LnBotClient : ILnBotClient
 
     /// <summary>API key management.</summary>
     public KeysResource Keys { get; }
+
+    /// <summary>L402 paywall authentication.</summary>
+    public L402Resource L402 { get; }
 
     /// <summary>Real-time event stream.</summary>
     public EventsResource Events { get; }
@@ -96,6 +99,7 @@ public sealed class LnBotClient : ILnBotClient
         Transactions = new TransactionsResource(this);
         Webhooks = new WebhooksResource(this);
         Keys = new KeysResource(this);
+        L402 = new L402Resource(this);
         Events = new EventsResource(this);
         Backup = new BackupResource(this);
         Restore = new RestoreResource(this);

@@ -10,7 +10,7 @@
 
     <!-- NuGet package metadata -->
     <PackageId>LnBot</PackageId>
-    <Version>0.4.0</Version>
+    <Version>0.5.0</Version>
     <Authors>LnBot</Authors>
     <Description>The official .NET SDK for LnBot — Bitcoin for AI Agents. Create wallets, send and receive sats over the Lightning Network.</Description>
     <PackageTags>bitcoin;lightning;lightning-network;lnbot;sdk;payments;sats</PackageTags>

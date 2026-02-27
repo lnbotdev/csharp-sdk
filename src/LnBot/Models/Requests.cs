@@ -121,3 +121,46 @@ public sealed class PaginationParams
     public int? Limit { get; set; }
     public int? After { get; set; }
 }
+
+// ---------------------------------------------------------------------------
+// L402
+// ---------------------------------------------------------------------------
+
+public sealed class CreateL402ChallengeRequest
+{
+    [JsonPropertyName("amount")]
+    public required long Amount { get; set; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+
+    [JsonPropertyName("expirySeconds")]
+    public int? ExpirySeconds { get; set; }
+
+    [JsonPropertyName("caveats")]
+    public List<string>? Caveats { get; set; }
+}
+
+public sealed class VerifyL402Request
+{
+    [JsonPropertyName("authorization")]
+    public required string Authorization { get; set; }
+}
+
+public sealed class PayL402Request
+{
+    [JsonPropertyName("wwwAuthenticate")]
+    public required string WwwAuthenticate { get; set; }
+
+    [JsonPropertyName("maxFee")]
+    public long? MaxFee { get; set; }
+
+    [JsonPropertyName("reference")]
+    public string? Reference { get; set; }
+
+    [JsonPropertyName("wait")]
+    public bool? Wait { get; set; }
+
+    [JsonPropertyName("timeout")]
+    public int? Timeout { get; set; }
+}

@@ -182,24 +182,6 @@ public sealed class TransactionResponse
     public DateTimeOffset? CreatedAt { get; init; }
 }
 
-public sealed class ApiKeyResponse
-{
-    [JsonPropertyName("id")]
-    public required string Id { get; init; }
-
-    [JsonPropertyName("name")]
-    public required string Name { get; init; }
-
-    [JsonPropertyName("hint")]
-    public required string Hint { get; init; }
-
-    [JsonPropertyName("createdAt")]
-    public DateTimeOffset? CreatedAt { get; init; }
-
-    [JsonPropertyName("lastUsedAt")]
-    public DateTimeOffset? LastUsedAt { get; init; }
-}
-
 public sealed class RotateApiKeyResponse
 {
     [JsonPropertyName("key")]
@@ -300,4 +282,65 @@ public sealed class RestorePasskeyCompleteResponse
 
     [JsonPropertyName("secondaryKey")]
     public required string SecondaryKey { get; init; }
+}
+
+// ---------------------------------------------------------------------------
+// L402
+// ---------------------------------------------------------------------------
+
+public sealed class L402ChallengeResponse
+{
+    [JsonPropertyName("macaroon")]
+    public required string Macaroon { get; init; }
+
+    [JsonPropertyName("invoice")]
+    public required string Invoice { get; init; }
+
+    [JsonPropertyName("paymentHash")]
+    public required string PaymentHash { get; init; }
+
+    [JsonPropertyName("expiresAt")]
+    public required DateTimeOffset ExpiresAt { get; init; }
+
+    [JsonPropertyName("wwwAuthenticate")]
+    public required string WwwAuthenticate { get; init; }
+}
+
+public sealed class VerifyL402Response
+{
+    [JsonPropertyName("valid")]
+    public required bool Valid { get; init; }
+
+    [JsonPropertyName("paymentHash")]
+    public string? PaymentHash { get; init; }
+
+    [JsonPropertyName("caveats")]
+    public List<string>? Caveats { get; init; }
+
+    [JsonPropertyName("error")]
+    public string? Error { get; init; }
+}
+
+public sealed class L402PayResponse
+{
+    [JsonPropertyName("authorization")]
+    public string? Authorization { get; init; }
+
+    [JsonPropertyName("paymentHash")]
+    public required string PaymentHash { get; init; }
+
+    [JsonPropertyName("preimage")]
+    public string? Preimage { get; init; }
+
+    [JsonPropertyName("amount")]
+    public required long Amount { get; init; }
+
+    [JsonPropertyName("fee")]
+    public long? Fee { get; init; }
+
+    [JsonPropertyName("paymentNumber")]
+    public required int PaymentNumber { get; init; }
+
+    [JsonPropertyName("status")]
+    public required string Status { get; init; }
 }

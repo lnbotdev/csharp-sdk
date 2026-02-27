@@ -11,12 +11,6 @@ public sealed class KeysResource
     internal KeysResource(LnBotClient client) => _client = client;
 
     /// <summary>
-    /// Lists all API keys (metadata only, not the key values).
-    /// </summary>
-    public Task<List<ApiKeyResponse>> ListAsync(CancellationToken cancellationToken = default)
-        => _client.GetAsync<List<ApiKeyResponse>>("/v1/keys", cancellationToken);
-
-    /// <summary>
     /// Rotates an API key. The old key is immediately invalidated.
     /// </summary>
     /// <param name="slot">Key slot: 0 = primary, 1 = secondary.</param>
