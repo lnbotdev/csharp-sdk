@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>LnBot</RootNamespace>
+    <AssemblyName>LnBot</AssemblyName>
+
+    <!-- NuGet package metadata -->
+    <PackageId>LnBot</PackageId>
+    <Version>0.4.0</Version>
+    <Authors>LnBot</Authors>
+    <Description>The official .NET SDK for LnBot — Bitcoin for AI Agents. Create wallets, send and receive sats over the Lightning Network.</Description>
+    <PackageTags>bitcoin;lightning;lightning-network;lnbot;sdk;payments;sats</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://ln.bot</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/lnbotdev/csharp-sdk</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>
