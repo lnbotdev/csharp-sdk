@@ -1,9 +1,9 @@
-# lnbot-csharp
+# ln.bot-csharp
 
 [![NuGet](https://img.shields.io/nuget/v/LnBot)](https://www.nuget.org/packages/LnBot)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
-**The official .NET SDK for [LnBot](https://ln.bot)** — Bitcoin for AI Agents.
+**The official .NET SDK for [ln.bot](https://ln.bot)** — Bitcoin for AI Agents.
 
 Give your AI agents, apps, and services access to Bitcoin over the Lightning Network. Create wallets, send and receive sats, and get real-time payment notifications.
 
@@ -20,7 +20,7 @@ var invoice = await client.Invoices.CreateAsync(new CreateInvoiceRequest
 });
 ```
 
-> LnBot also ships a **[TypeScript SDK](https://www.npmjs.com/package/@lnbot/sdk)**, **[Python SDK](https://pypi.org/project/lnbot/)**, **[Go SDK](https://pkg.go.dev/github.com/lnbotdev/go-sdk)**, **[Rust SDK](https://crates.io/crates/lnbot)**, **[CLI](https://ln.bot/docs)**, and **[MCP server](https://ln.bot/docs)**.
+> ln.bot also ships a **[TypeScript SDK](https://www.npmjs.com/package/@lnbot/sdk)**, **[Python SDK](https://pypi.org/project/lnbot/)**, **[Go SDK](https://pkg.go.dev/github.com/lnbotdev/go-sdk)**, **[Rust SDK](https://crates.io/crates/lnbot)**, **[CLI](https://ln.bot/docs)**, and **[MCP server](https://ln.bot/docs)**.
 
 ---
 
