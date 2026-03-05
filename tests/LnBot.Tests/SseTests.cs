@@ -11,7 +11,7 @@ public class InvoiceWatchTests
         var (client, _) = TestHelper.CreateSseClient(sse);
 
         var events = new List<Models.InvoiceEvent>();
-        await foreach (var evt in client.Invoices.WatchAsync(1))
+        await foreach (var evt in client.Wallet("wal_1").Invoices.WatchAsync(1))
             events.Add(evt);
 
         Assert.Single(events);
@@ -28,7 +28,7 @@ public class InvoiceWatchTests
         var (client, _) = TestHelper.CreateSseClient(sse);
 
         var events = new List<Models.InvoiceEvent>();
-        await foreach (var evt in client.Invoices.WatchAsync(1))
+        await foreach (var evt in client.Wallet("wal_1").Invoices.WatchAsync(1))
             events.Add(evt);
 
         Assert.Equal(2, events.Count);
@@ -46,7 +46,7 @@ public class InvoiceWatchTests
         var (client, _) = TestHelper.CreateSseClient(sse);
 
         var events = new List<Models.InvoiceEvent>();
-        await foreach (var evt in client.Invoices.WatchAsync(1))
+        await foreach (var evt in client.Wallet("wal_1").Invoices.WatchAsync(1))
             events.Add(evt);
 
         Assert.Single(events);
@@ -57,9 +57,9 @@ public class InvoiceWatchTests
     {
         var (client, handler) = TestHelper.CreateSseClient("");
 
-        await foreach (var _ in client.Invoices.WatchAsync(42, timeout: 120)) { }
+        await foreach (var _ in client.Wallet("wal_1").Invoices.WatchAsync(42, timeout: 120)) { }
 
-        Assert.Contains("/v1/invoices/42/events", handler.LastRequest!.RequestUri!.AbsolutePath);
+        Assert.Contains("/v1/wallets/wal_1/invoices/42/events", handler.LastRequest!.RequestUri!.AbsolutePath);
         Assert.Contains("timeout=120", handler.LastRequest.RequestUri!.Query);
     }
 
@@ -68,7 +68,7 @@ public class InvoiceWatchTests
     {
         var (client, handler) = TestHelper.CreateSseClient("");
 
-        await foreach (var _ in client.Invoices.WatchAsync(1)) { }
+        await foreach (var _ in client.Wallet("wal_1").Invoices.WatchAsync(1)) { }
 
         Assert.DoesNotContain("timeout", handler.LastRequest!.RequestUri!.ToString());
     }
@@ -78,7 +78,7 @@ public class InvoiceWatchTests
     {
         var (client, handler) = TestHelper.CreateSseClient("");
 
-        await foreach (var _ in client.Invoices.WatchAsync(1)) { }
+        await foreach (var _ in client.Wallet("wal_1").Invoices.WatchAsync(1)) { }
 
         Assert.Contains("text/event-stream", handler.LastRequest!.Headers.Accept.ToString());
     }
@@ -88,9 +88,9 @@ public class InvoiceWatchTests
     {
         var (client, handler) = TestHelper.CreateSseClient("");
 
-        await foreach (var _ in client.Invoices.WatchByHashAsync("abc/123")) { }
+        await foreach (var _ in client.Wallet("wal_1").Invoices.WatchByHashAsync("abc/123")) { }
 
-        Assert.Contains("/v1/invoices/abc%2F123/events", handler.LastRequest!.RequestUri!.AbsolutePath);
+        Assert.Contains("/v1/wallets/wal_1/invoices/abc%2F123/events", handler.LastRequest!.RequestUri!.AbsolutePath);
     }
 
     [Fact]
@@ -99,7 +99,7 @@ public class InvoiceWatchTests
         var (client, _) = TestHelper.CreateSseClient("");
 
         var events = new List<Models.InvoiceEvent>();
-        await foreach (var evt in client.Invoices.WatchAsync(1))
+        await foreach (var evt in client.Wallet("wal_1").Invoices.WatchAsync(1))
             events.Add(evt);
 
         Assert.Empty(events);
@@ -115,7 +115,7 @@ public class PaymentWatchTests
         var (client, _) = TestHelper.CreateSseClient(sse);
 
         var events = new List<Models.PaymentEvent>();
-        await foreach (var evt in client.Payments.WatchAsync(1))
+        await foreach (var evt in client.Wallet("wal_1").Payments.WatchAsync(1))
             events.Add(evt);
 
         Assert.Single(events);
@@ -128,9 +128,9 @@ public class PaymentWatchTests
     {
         var (client, handler) = TestHelper.CreateSseClient("");
 
-        await foreach (var _ in client.Payments.WatchAsync(7, timeout: 60)) { }
+        await foreach (var _ in client.Wallet("wal_1").Payments.WatchAsync(7, timeout: 60)) { }
 
-        Assert.Contains("/v1/payments/7/events", handler.LastRequest!.RequestUri!.AbsolutePath);
+        Assert.Contains("/v1/wallets/wal_1/payments/7/events", handler.LastRequest!.RequestUri!.AbsolutePath);
         Assert.Contains("timeout=60", handler.LastRequest.RequestUri!.Query);
     }
 
@@ -139,9 +139,9 @@ public class PaymentWatchTests
     {
         var (client, handler) = TestHelper.CreateSseClient("");
 
-        await foreach (var _ in client.Payments.WatchByHashAsync("hash123")) { }
+        await foreach (var _ in client.Wallet("wal_1").Payments.WatchByHashAsync("hash123")) { }
 
-        Assert.Contains("/v1/payments/hash123/events", handler.LastRequest!.RequestUri!.AbsolutePath);
+        Assert.Contains("/v1/wallets/wal_1/payments/hash123/events", handler.LastRequest!.RequestUri!.AbsolutePath);
     }
 }
 
@@ -154,7 +154,7 @@ public class EventStreamTests
         var (client, _) = TestHelper.CreateSseClient(sse);
 
         var events = new List<Models.WalletEvent>();
-        await foreach (var evt in client.Events.StreamAsync())
+        await foreach (var evt in client.Wallet("wal_1").Events.StreamAsync())
             events.Add(evt);
 
         Assert.Single(events);
@@ -166,9 +166,9 @@ public class EventStreamTests
     {
         var (client, handler) = TestHelper.CreateSseClient("");
 
-        await foreach (var _ in client.Events.StreamAsync()) { }
+        await foreach (var _ in client.Wallet("wal_1").Events.StreamAsync()) { }
 
-        Assert.EndsWith("/v1/events", handler.LastRequest!.RequestUri!.AbsolutePath);
+        Assert.EndsWith("/v1/wallets/wal_1/events", handler.LastRequest!.RequestUri!.AbsolutePath);
     }
 
     [Fact]
@@ -181,7 +181,7 @@ public class EventStreamTests
         var (client, _) = TestHelper.CreateSseClient(sse);
 
         var events = new List<Models.WalletEvent>();
-        await foreach (var evt in client.Events.StreamAsync())
+        await foreach (var evt in client.Wallet("wal_1").Events.StreamAsync())
             events.Add(evt);
 
         Assert.Single(events);

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using LnBot.Exceptions;
+using LnBot.Models;
 using LnBot.Resources;
 
 namespace LnBot;
@@ -12,7 +13,7 @@ namespace LnBot;
 /// </summary>
 public sealed class LnBotClient : ILnBotClient
 {
-    internal const string Version = "0.5.0";
+    internal const string Version = "1.0.0";
     internal static readonly string DefaultBaseUrl = "https://api.ln.bot";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -25,32 +26,14 @@ public sealed class LnBotClient : ILnBotClient
     private readonly HttpClient _http;
     private readonly bool _ownsHttpClient;
 
-    /// <summary>Wallet management.</summary>
+    /// <summary>Account-level wallet management (create, list).</summary>
     public WalletsResource Wallets { get; }
 
-    /// <summary>Create and query invoices.</summary>
-    public InvoicesResource Invoices { get; }
-
-    /// <summary>Send payments.</summary>
-    public PaymentsResource Payments { get; }
-
-    /// <summary>Lightning address management.</summary>
-    public AddressesResource Addresses { get; }
-
-    /// <summary>Transaction history.</summary>
-    public TransactionsResource Transactions { get; }
-
-    /// <summary>Webhook endpoints.</summary>
-    public WebhooksResource Webhooks { get; }
-
-    /// <summary>API key management.</summary>
+    /// <summary>Account-level API key management (uk_ keys).</summary>
     public KeysResource Keys { get; }
 
-    /// <summary>L402 paywall authentication.</summary>
-    public L402Resource L402 { get; }
-
-    /// <summary>Real-time event stream.</summary>
-    public EventsResource Events { get; }
+    /// <summary>Public invoice creation (no auth required).</summary>
+    public PublicInvoicesResource Invoices { get; }
 
     /// <summary>Backup wallet access.</summary>
     public BackupResource Backup { get; }
@@ -61,7 +44,7 @@ public sealed class LnBotClient : ILnBotClient
     /// <summary>
     /// Creates a new LnBot client.
     /// </summary>
-    /// <param name="apiKey">API key for authenticated endpoints. Pass null or empty for unauthenticated usage (e.g. wallet creation).</param>
+    /// <param name="apiKey">API key (uk_ or wk_). Pass null for unauthenticated usage (e.g. public invoice creation).</param>
     /// <param name="options">Optional configuration.</param>
     public LnBotClient(string? apiKey = null, LnBotClientOptions? options = null)
     {
@@ -93,17 +76,36 @@ public sealed class LnBotClient : ILnBotClient
         }
 
         Wallets = new WalletsResource(this);
-        Invoices = new InvoicesResource(this);
-        Payments = new PaymentsResource(this);
-        Addresses = new AddressesResource(this);
-        Transactions = new TransactionsResource(this);
-        Webhooks = new WebhooksResource(this);
         Keys = new KeysResource(this);
-        L402 = new L402Resource(this);
-        Events = new EventsResource(this);
+        Invoices = new PublicInvoicesResource(this);
         Backup = new BackupResource(this);
         Restore = new RestoreResource(this);
     }
+
+    /// <summary>
+    /// Registers a new account. Returns user keys and recovery passphrase.
+    /// </summary>
+    public Task<RegisterResponse> RegisterAsync(CancellationToken cancellationToken = default)
+        => PostAsync<RegisterResponse>("/v1/register", null, cancellationToken);
+
+    /// <summary>
+    /// Returns the authenticated identity.
+    /// </summary>
+    public Task<MeResponse> MeAsync(CancellationToken cancellationToken = default)
+        => GetAsync<MeResponse>("/v1/me", cancellationToken);
+
+    /// <summary>
+    /// Returns a wallet-scoped handle for the given wallet ID.
+    /// This is a factory method — it does not make an HTTP call.
+    /// </summary>
+    /// <param name="walletId">The wallet ID (e.g. "wal_abc123").</param>
+    public WalletScope Wallet(string walletId)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(walletId);
+        return new WalletScope(this, walletId);
+    }
+
+    // ── Internal HTTP helpers ──
 
     internal async Task<T> GetAsync<T>(string path, CancellationToken cancellationToken = default)
     {

@@ -3,7 +3,7 @@ using LnBot.Models;
 namespace LnBot.Resources;
 
 /// <summary>
-/// Wallet management operations.
+/// Account-level wallet management: create and list wallets.
 /// </summary>
 public sealed class WalletsResource
 {
@@ -11,20 +11,14 @@ public sealed class WalletsResource
     internal WalletsResource(LnBotClient client) => _client = client;
 
     /// <summary>
-    /// Creates a new wallet. No authentication required.
+    /// Creates a new wallet under the authenticated account.
     /// </summary>
-    public Task<CreateWalletResponse> CreateAsync(CreateWalletRequest? request = null, CancellationToken cancellationToken = default)
-        => _client.PostAsync<CreateWalletResponse>("/v1/wallets", request, cancellationToken);
+    public Task<CreateWalletResponse> CreateAsync(CancellationToken cancellationToken = default)
+        => _client.PostAsync<CreateWalletResponse>("/v1/wallets", null, cancellationToken);
 
     /// <summary>
-    /// Returns the authenticated wallet.
+    /// Lists all wallets belonging to the authenticated account.
     /// </summary>
-    public Task<WalletResponse> CurrentAsync(CancellationToken cancellationToken = default)
-        => _client.GetAsync<WalletResponse>("/v1/wallets/current", cancellationToken);
-
-    /// <summary>
-    /// Updates the wallet name.
-    /// </summary>
-    public Task<WalletResponse> UpdateAsync(UpdateWalletRequest request, CancellationToken cancellationToken = default)
-        => _client.PatchAsync<WalletResponse>("/v1/wallets/current", request, cancellationToken);
+    public Task<List<WalletListItem>> ListAsync(CancellationToken cancellationToken = default)
+        => _client.GetAsync<List<WalletListItem>>("/v1/wallets", cancellationToken);
 }

@@ -3,19 +3,25 @@ using LnBot.Models;
 namespace LnBot.Resources;
 
 /// <summary>
-/// Transaction history.
+/// Wallet-scoped transaction history.
 /// </summary>
 public sealed class TransactionsResource
 {
     private readonly LnBotClient _client;
-    internal TransactionsResource(LnBotClient client) => _client = client;
+    private readonly string _prefix;
+
+    internal TransactionsResource(LnBotClient client, string prefix)
+    {
+        _client = client;
+        _prefix = prefix;
+    }
 
     /// <summary>
     /// Lists transactions in reverse chronological order.
     /// </summary>
     public Task<List<TransactionResponse>> ListAsync(PaginationParams? pagination = null, CancellationToken cancellationToken = default)
     {
-        var path = "/v1/transactions";
+        var path = $"{_prefix}/transactions";
         if (pagination is not null)
         {
             var parts = new List<string>();

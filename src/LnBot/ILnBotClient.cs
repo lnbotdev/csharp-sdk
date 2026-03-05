@@ -1,3 +1,4 @@
+using LnBot.Models;
 using LnBot.Resources;
 
 namespace LnBot;
@@ -7,36 +8,27 @@ namespace LnBot;
 /// </summary>
 public interface ILnBotClient : IDisposable
 {
-    /// <summary>Wallet management.</summary>
+    /// <summary>Account-level wallet management (create, list).</summary>
     WalletsResource Wallets { get; }
 
-    /// <summary>Create and query invoices.</summary>
-    InvoicesResource Invoices { get; }
-
-    /// <summary>Send payments.</summary>
-    PaymentsResource Payments { get; }
-
-    /// <summary>Lightning address management.</summary>
-    AddressesResource Addresses { get; }
-
-    /// <summary>Transaction history.</summary>
-    TransactionsResource Transactions { get; }
-
-    /// <summary>Webhook endpoints.</summary>
-    WebhooksResource Webhooks { get; }
-
-    /// <summary>API key management.</summary>
+    /// <summary>Account-level API key management (uk_ keys).</summary>
     KeysResource Keys { get; }
 
-    /// <summary>L402 paywall authentication.</summary>
-    L402Resource L402 { get; }
-
-    /// <summary>Real-time event stream.</summary>
-    EventsResource Events { get; }
+    /// <summary>Public invoice creation (no auth required).</summary>
+    PublicInvoicesResource Invoices { get; }
 
     /// <summary>Backup wallet access.</summary>
     BackupResource Backup { get; }
 
     /// <summary>Restore wallet access.</summary>
     RestoreResource Restore { get; }
+
+    /// <summary>Registers a new account.</summary>
+    Task<RegisterResponse> RegisterAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the authenticated identity.</summary>
+    Task<MeResponse> MeAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Returns a wallet-scoped handle.</summary>
+    WalletScope Wallet(string walletId);
 }

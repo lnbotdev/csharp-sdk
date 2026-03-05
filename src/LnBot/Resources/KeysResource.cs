@@ -3,7 +3,7 @@ using LnBot.Models;
 namespace LnBot.Resources;
 
 /// <summary>
-/// API key management.
+/// Account-level API key management (uk_ keys).
 /// </summary>
 public sealed class KeysResource
 {
@@ -11,7 +11,7 @@ public sealed class KeysResource
     internal KeysResource(LnBotClient client) => _client = client;
 
     /// <summary>
-    /// Rotates an API key. The old key is immediately invalidated.
+    /// Rotates an account API key. The old key is immediately invalidated.
     /// </summary>
     /// <param name="slot">Key slot: 0 = primary, 1 = secondary.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

@@ -11,9 +11,10 @@ Give your AI agents, apps, and services access to Bitcoin over the Lightning Net
 using LnBot;
 using LnBot.Models;
 
-using var client = new LnBotClient("key_...");
+using var client = new LnBotClient("uk_...");
+var w = client.Wallet("wal_...");
 
-var invoice = await client.Invoices.CreateAsync(new CreateInvoiceRequest
+var invoice = await w.Invoices.CreateAsync(new CreateInvoiceRequest
 {
     Amount = 1000,
     Memo = "Coffee",
@@ -34,27 +35,31 @@ dotnet add package LnBot
 
 ## Quick start
 
-### Create a wallet
+### Register an account
 
 ```csharp
 using LnBot;
-using LnBot.Models;
 
 using var client = new LnBotClient();
+var account = await client.RegisterAsync();
+Console.WriteLine(account.PrimaryKey);
+Console.WriteLine(account.RecoveryPassphrase);
+```
 
-var wallet = await client.Wallets.CreateAsync(new CreateWalletRequest
-{
-    Name = "my-agent",
-});
-Console.WriteLine(wallet.PrimaryKey);
+### Create a wallet
+
+```csharp
+using var client = new LnBotClient(account.PrimaryKey);
+var wallet = await client.Wallets.CreateAsync();
+Console.WriteLine(wallet.WalletId);
 ```
 
 ### Receive sats
 
 ```csharp
-using var client = new LnBotClient(wallet.PrimaryKey);
+var w = client.Wallet(wallet.WalletId);
 
-var invoice = await client.Invoices.CreateAsync(new CreateInvoiceRequest
+var invoice = await w.Invoices.CreateAsync(new CreateInvoiceRequest
 {
     Amount = 1000,
     Memo = "Payment for task #42",
@@ -65,7 +70,7 @@ Console.WriteLine(invoice.Bolt11);
 ### Wait for payment (SSE)
 
 ```csharp
-await foreach (var evt in client.Invoices.WatchAsync(invoice.Number))
+await foreach (var evt in w.Invoices.WatchAsync(invoice.Number))
 {
     if (evt.Event == "settled")
     {
@@ -78,7 +83,7 @@ await foreach (var evt in client.Invoices.WatchAsync(invoice.Number))
 ### Send sats
 
 ```csharp
-var payment = await client.Payments.CreateAsync(new CreatePaymentRequest
+var payment = await w.Payments.CreateAsync(new CreatePaymentRequest
 {
     Target = "alice@ln.bot",
     Amount = 500,
@@ -88,8 +93,42 @@ var payment = await client.Payments.CreateAsync(new CreatePaymentRequest
 ### Check balance
 
 ```csharp
-var current = await client.Wallets.CurrentAsync();
-Console.WriteLine($"{current.Available} sats available");
+var info = await w.GetAsync();
+Console.WriteLine($"{info.Available} sats available");
+```
+
+---
+
+## Wallet-scoped API
+
+All wallet operations go through a `WalletScope` obtained via `client.Wallet(walletId)`:
+
+```csharp
+var w = client.Wallet("wal_abc123");
+
+// Wallet info
+var info = await w.GetAsync();
+await w.UpdateAsync(new UpdateWalletRequest { Name = "production" });
+
+// Sub-resources
+w.Key          // Wallet key management (wk_ keys)
+w.Invoices     // Create, list, get, watch invoices
+w.Payments     // Send, list, get, watch, resolve payments
+w.Addresses    // Create, list, delete, transfer Lightning addresses
+w.Transactions // List transaction history
+w.Webhooks     // Create, list, delete webhook endpoints
+w.Events       // Real-time SSE event stream
+w.L402         // L402 paywall authentication
+```
+
+Account-level operations stay on the client:
+
+```csharp
+await client.RegisterAsync();          // Register new account
+await client.MeAsync();               // Get authenticated identity
+await client.Wallets.CreateAsync();    // Create wallet
+await client.Wallets.ListAsync();      // List wallets
+await client.Keys.RotateAsync(0);     // Rotate account key
 ```
 
 ---
@@ -101,7 +140,7 @@ using LnBot.Exceptions;
 
 try
 {
-    var wallet = await client.Wallets.CurrentAsync();
+    var info = await w.GetAsync();
 }
 catch (NotFoundException ex)
 {
@@ -124,7 +163,7 @@ catch (LnBotException ex)
 ## Configuration
 
 ```csharp
-using var client = new LnBotClient("key_...", new LnBotClientOptions
+using var client = new LnBotClient("uk_...", new LnBotClientOptions
 {
     BaseUrl = "https://api.ln.bot",
     Timeout = TimeSpan.FromSeconds(30),
@@ -135,7 +174,7 @@ Or bring your own `HttpClient`:
 
 ```csharp
 var httpClient = new HttpClient();
-using var client = new LnBotClient("key_...", new LnBotClientOptions
+using var client = new LnBotClient("uk_...", new LnBotClientOptions
 {
     HttpClient = httpClient,
 });
@@ -146,8 +185,10 @@ using var client = new LnBotClient("key_...", new LnBotClientOptions
 ## L402 paywalls
 
 ```csharp
+var w = client.Wallet("wal_...");
+
 // Create a challenge (server side)
-var challenge = await client.L402.CreateChallengeAsync(new CreateL402ChallengeRequest
+var challenge = await w.L402.CreateChallengeAsync(new CreateL402ChallengeRequest
 {
     Amount = 100,
     Description = "API access",
@@ -155,13 +196,13 @@ var challenge = await client.L402.CreateChallengeAsync(new CreateL402ChallengeRe
 });
 
 // Pay the challenge (client side)
-var result = await client.L402.PayAsync(new PayL402Request
+var result = await w.L402.PayAsync(new PayL402Request
 {
     WwwAuthenticate = challenge.WwwAuthenticate,
 });
 
 // Verify a token (server side, stateless)
-var v = await client.L402.VerifyAsync(new VerifyL402Request
+var v = await w.L402.VerifyAsync(new VerifyL402Request
 {
     Authorization = result.Authorization!,
 });
@@ -172,6 +213,7 @@ var v = await client.L402.VerifyAsync(new VerifyL402Request
 ## Features
 
 - **Zero dependencies** — `System.Net.Http` + `System.Text.Json` only
+- **Wallet-scoped API** — `client.Wallet(id)` returns a typed scope with all sub-resources
 - **Async-first** — every method returns `Task<T>` with `CancellationToken` support
 - **Typed exceptions** — `BadRequestException`, `NotFoundException`, `ConflictException`, `UnauthorizedException`, `ForbiddenException`
 - **SSE support** — `WatchAsync` returns `IAsyncEnumerable<T>` for real-time events

@@ -2,12 +2,6 @@ using System.Text.Json.Serialization;
 
 namespace LnBot.Models;
 
-public sealed class CreateWalletRequest
-{
-    [JsonPropertyName("name")]
-    public string? Name { get; set; }
-}
-
 public sealed class UpdateWalletRequest
 {
     [JsonPropertyName("name")]

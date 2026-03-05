@@ -2,6 +2,35 @@ using System.Text.Json.Serialization;
 
 namespace LnBot.Models;
 
+// ---------------------------------------------------------------------------
+// Account
+// ---------------------------------------------------------------------------
+
+public sealed class RegisterResponse
+{
+    [JsonPropertyName("userId")]
+    public required string UserId { get; init; }
+
+    [JsonPropertyName("primaryKey")]
+    public required string PrimaryKey { get; init; }
+
+    [JsonPropertyName("secondaryKey")]
+    public required string SecondaryKey { get; init; }
+
+    [JsonPropertyName("recoveryPassphrase")]
+    public required string RecoveryPassphrase { get; init; }
+}
+
+public sealed class MeResponse
+{
+    [JsonPropertyName("walletId")]
+    public string? WalletId { get; init; }
+}
+
+// ---------------------------------------------------------------------------
+// Wallets
+// ---------------------------------------------------------------------------
+
 public sealed class WalletResponse
 {
     [JsonPropertyName("walletId")]
@@ -25,21 +54,53 @@ public sealed class CreateWalletResponse
     [JsonPropertyName("walletId")]
     public required string WalletId { get; init; }
 
-    [JsonPropertyName("primaryKey")]
-    public required string PrimaryKey { get; init; }
-
-    [JsonPropertyName("secondaryKey")]
-    public required string SecondaryKey { get; init; }
-
     [JsonPropertyName("name")]
     public required string Name { get; init; }
 
     [JsonPropertyName("address")]
     public required string Address { get; init; }
-
-    [JsonPropertyName("recoveryPassphrase")]
-    public required string RecoveryPassphrase { get; init; }
 }
+
+public sealed class WalletListItem
+{
+    [JsonPropertyName("walletId")]
+    public required string WalletId { get; init; }
+
+    [JsonPropertyName("name")]
+    public required string Name { get; init; }
+
+    [JsonPropertyName("createdAt")]
+    public DateTimeOffset? CreatedAt { get; init; }
+}
+
+// ---------------------------------------------------------------------------
+// Wallet Key
+// ---------------------------------------------------------------------------
+
+public sealed class WalletKeyResponse
+{
+    [JsonPropertyName("key")]
+    public required string Key { get; init; }
+
+    [JsonPropertyName("hint")]
+    public required string Hint { get; init; }
+}
+
+public sealed class WalletKeyInfoResponse
+{
+    [JsonPropertyName("hint")]
+    public required string Hint { get; init; }
+
+    [JsonPropertyName("createdAt")]
+    public DateTimeOffset? CreatedAt { get; init; }
+
+    [JsonPropertyName("lastUsedAt")]
+    public DateTimeOffset? LastUsedAt { get; init; }
+}
+
+// ---------------------------------------------------------------------------
+// Invoices
+// ---------------------------------------------------------------------------
 
 public sealed class InvoiceResponse
 {
@@ -89,6 +150,10 @@ public sealed class AddressInvoiceResponse
     public required DateTimeOffset ExpiresAt { get; init; }
 }
 
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
 public sealed class PaymentResponse
 {
     [JsonPropertyName("number")]
@@ -131,6 +196,28 @@ public sealed class PaymentResponse
     public DateTimeOffset? SettledAt { get; init; }
 }
 
+public sealed class ResolveTargetResponse
+{
+    [JsonPropertyName("type")]
+    public required string Type { get; init; }
+
+    [JsonPropertyName("min")]
+    public long? Min { get; init; }
+
+    [JsonPropertyName("max")]
+    public long? Max { get; init; }
+
+    [JsonPropertyName("fixed")]
+    public bool? Fixed { get; init; }
+
+    [JsonPropertyName("amount")]
+    public long? Amount { get; init; }
+}
+
+// ---------------------------------------------------------------------------
+// Addresses
+// ---------------------------------------------------------------------------
+
 public sealed class AddressResponse
 {
     [JsonPropertyName("address")]
@@ -145,6 +232,19 @@ public sealed class AddressResponse
     [JsonPropertyName("createdAt")]
     public DateTimeOffset? CreatedAt { get; init; }
 }
+
+public sealed class TransferAddressResponse
+{
+    [JsonPropertyName("address")]
+    public required string Address { get; init; }
+
+    [JsonPropertyName("transferredTo")]
+    public required string TransferredTo { get; init; }
+}
+
+// ---------------------------------------------------------------------------
+// Transactions
+// ---------------------------------------------------------------------------
 
 public sealed class TransactionResponse
 {
@@ -182,6 +282,10 @@ public sealed class TransactionResponse
     public DateTimeOffset? CreatedAt { get; init; }
 }
 
+// ---------------------------------------------------------------------------
+// Keys (account-level)
+// ---------------------------------------------------------------------------
+
 public sealed class RotateApiKeyResponse
 {
     [JsonPropertyName("key")]
@@ -190,6 +294,10 @@ public sealed class RotateApiKeyResponse
     [JsonPropertyName("name")]
     public required string Name { get; init; }
 }
+
+// ---------------------------------------------------------------------------
+// Webhooks
+// ---------------------------------------------------------------------------
 
 public sealed class WebhookResponse
 {
@@ -221,14 +329,9 @@ public sealed class CreateWebhookResponse
     public DateTimeOffset? CreatedAt { get; init; }
 }
 
-public sealed class TransferAddressResponse
-{
-    [JsonPropertyName("address")]
-    public required string Address { get; init; }
-
-    [JsonPropertyName("transferredTo")]
-    public required string TransferredTo { get; init; }
-}
+// ---------------------------------------------------------------------------
+// Backup / Restore
+// ---------------------------------------------------------------------------
 
 public sealed class RecoveryBackupResponse
 {

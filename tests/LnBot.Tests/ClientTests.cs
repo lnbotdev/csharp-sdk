@@ -15,27 +15,74 @@ public class ClientTests
         Assert.NotNull(client.Wallets);
         Assert.NotNull(client.Keys);
         Assert.NotNull(client.Invoices);
-        Assert.NotNull(client.Payments);
-        Assert.NotNull(client.Addresses);
-        Assert.NotNull(client.Transactions);
-        Assert.NotNull(client.Webhooks);
-        Assert.NotNull(client.Events);
         Assert.NotNull(client.Backup);
         Assert.NotNull(client.Restore);
-        Assert.NotNull(client.L402);
+    }
+
+    [Fact]
+    public void Wallet_ReturnsWalletScope()
+    {
+        var (client, _) = TestHelper.CreateClient();
+        var w = client.Wallet("wal_abc");
+        Assert.NotNull(w);
+        Assert.Equal("wal_abc", w.WalletId);
+        Assert.NotNull(w.Key);
+        Assert.NotNull(w.Invoices);
+        Assert.NotNull(w.Payments);
+        Assert.NotNull(w.Addresses);
+        Assert.NotNull(w.Transactions);
+        Assert.NotNull(w.Webhooks);
+        Assert.NotNull(w.Events);
+        Assert.NotNull(w.L402);
+    }
+
+    [Fact]
+    public void Wallet_ThrowsForNullOrEmpty()
+    {
+        var (client, _) = TestHelper.CreateClient();
+        Assert.Throws<ArgumentException>(() => client.Wallet(""));
+        Assert.Throws<ArgumentNullException>(() => client.Wallet(null!));
+    }
+
+    [Fact]
+    public async Task RegisterAsync_PostsToRegister()
+    {
+        var (client, handler) = TestHelper.CreateClient();
+        handler.SetResponse(new { userId = "usr_1", primaryKey = "uk_p", secondaryKey = "uk_s", recoveryPassphrase = "word1 word2" });
+
+        var result = await client.RegisterAsync();
+
+        Assert.Equal(HttpMethod.Post, handler.LastRequest!.Method);
+        Assert.EndsWith("/v1/register", handler.LastRequest.RequestUri!.AbsolutePath);
+        Assert.Equal("usr_1", result.UserId);
+        Assert.Equal("uk_p", result.PrimaryKey);
+    }
+
+    [Fact]
+    public async Task MeAsync_GetsMe()
+    {
+        var (client, handler) = TestHelper.CreateClient();
+        handler.SetResponse(new { walletId = "wal_abc" });
+
+        var result = await client.MeAsync();
+
+        Assert.Equal(HttpMethod.Get, handler.LastRequest!.Method);
+        Assert.EndsWith("/v1/me", handler.LastRequest.RequestUri!.AbsolutePath);
+        Assert.Equal("wal_abc", result.WalletId);
     }
 
     [Fact]
     public async Task SendsAuthorizationHeader()
     {
-        var (client, handler) = TestHelper.CreateClient("key_abc");
+        var (client, handler) = TestHelper.CreateClient("uk_abc");
         handler.SetResponse(new { walletId = "wal_1", name = "Test", balance = 0, onHold = 0, available = 0 });
 
-        await client.Wallets.CurrentAsync();
+        var w = client.Wallet("wal_1");
+        await w.GetAsync();
 
         Assert.NotNull(handler.LastRequest);
         Assert.Equal("Bearer", handler.LastRequest.Headers.Authorization?.Scheme);
-        Assert.Equal("key_abc", handler.LastRequest.Headers.Authorization?.Parameter);
+        Assert.Equal("uk_abc", handler.LastRequest.Headers.Authorization?.Parameter);
     }
 
     [Fact]
@@ -45,7 +92,7 @@ public class ClientTests
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://api.ln.bot") };
         var client = new LnBotClient(null, new LnBotClientOptions { HttpClient = http });
 
-        handler.SetResponse(new { walletId = "wal_1", primaryKey = "k", secondaryKey = "k", name = "n", address = "a", recoveryPassphrase = "p" });
+        handler.SetResponse(new { walletId = "wal_1", name = "n", address = "a" });
         await client.Wallets.CreateAsync();
 
         Assert.Null(handler.LastRequest!.Headers.Authorization);
@@ -57,7 +104,8 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetResponse(new { walletId = "wal_1", name = "Test", balance = 0, onHold = 0, available = 0 });
 
-        await client.Wallets.CurrentAsync();
+        var w = client.Wallet("wal_1");
+        await w.GetAsync();
 
         var ua = handler.LastRequest!.Headers.UserAgent.ToString();
         Assert.Contains("lnbot-csharp/", ua);
@@ -69,7 +117,8 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetResponse(new { number = 1, status = "pending", amount = 100, bolt11 = "lnbc1..." });
 
-        await client.Invoices.CreateAsync(new CreateInvoiceRequest { Amount = 100 });
+        var w = client.Wallet("wal_1");
+        await w.Invoices.CreateAsync(new CreateInvoiceRequest { Amount = 100 });
 
         Assert.NotNull(handler.LastRequest!.Content);
         Assert.Equal("application/json", handler.LastRequest.Content!.Headers.ContentType!.MediaType);
@@ -81,7 +130,8 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetResponse(new { number = 1, status = "pending", amount = 100, bolt11 = "lnbc1..." });
 
-        await client.Invoices.CreateAsync(new CreateInvoiceRequest { Amount = 100, Memo = "test memo" });
+        var w = client.Wallet("wal_1");
+        await w.Invoices.CreateAsync(new CreateInvoiceRequest { Amount = 100, Memo = "test memo" });
 
         var body = JsonDocument.Parse(handler.LastRequestBody!);
         Assert.True(body.RootElement.TryGetProperty("amount", out _));
@@ -96,7 +146,8 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetResponse(new { number = 1, status = "pending", amount = 100, bolt11 = "lnbc1..." });
 
-        await client.Invoices.CreateAsync(new CreateInvoiceRequest { Amount = 100 });
+        var w = client.Wallet("wal_1");
+        await w.Invoices.CreateAsync(new CreateInvoiceRequest { Amount = 100 });
 
         var body = JsonDocument.Parse(handler.LastRequestBody!);
         Assert.False(body.RootElement.TryGetProperty("memo", out _));
@@ -109,7 +160,8 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetResponse(new { walletId = "wal_123", name = "My Wallet", balance = 1000, onHold = 50, available = 950 });
 
-        var wallet = await client.Wallets.CurrentAsync();
+        var w = client.Wallet("wal_123");
+        var wallet = await w.GetAsync();
 
         Assert.Equal("wal_123", wallet.WalletId);
         Assert.Equal("My Wallet", wallet.Name);
@@ -124,7 +176,7 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetResponse(new { walletId = "wal_1", name = "n", balance = 0, onHold = 0, available = 0 });
 
-        await client.Wallets.CurrentAsync();
+        await client.Wallet("wal_1").GetAsync();
 
         Assert.Equal(HttpMethod.Get, handler.LastRequest!.Method);
     }
@@ -135,7 +187,7 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetResponse(new { number = 1, status = "pending", amount = 100, bolt11 = "lnbc1..." });
 
-        await client.Invoices.CreateAsync(new CreateInvoiceRequest { Amount = 100 });
+        await client.Wallet("wal_1").Invoices.CreateAsync(new CreateInvoiceRequest { Amount = 100 });
 
         Assert.Equal(HttpMethod.Post, handler.LastRequest!.Method);
     }
@@ -146,7 +198,7 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetResponse(new { walletId = "wal_1", name = "New", balance = 0, onHold = 0, available = 0 });
 
-        await client.Wallets.UpdateAsync(new UpdateWalletRequest { Name = "New" });
+        await client.Wallet("wal_1").UpdateAsync(new UpdateWalletRequest { Name = "New" });
 
         Assert.Equal(HttpMethod.Patch, handler.LastRequest!.Method);
     }
@@ -157,7 +209,7 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetRawResponse("", HttpStatusCode.NoContent);
 
-        await client.Webhooks.DeleteAsync("wh_123");
+        await client.Wallet("wal_1").Webhooks.DeleteAsync("wh_123");
 
         Assert.Equal(HttpMethod.Delete, handler.LastRequest!.Method);
     }
@@ -170,7 +222,7 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetRawResponse("{\"message\":\"invalid amount\"}", HttpStatusCode.BadRequest);
 
-        var ex = await Assert.ThrowsAsync<BadRequestException>(() => client.Wallets.CurrentAsync());
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => client.Wallet("wal_1").GetAsync());
         Assert.Equal("invalid amount", ex.Message);
         Assert.Equal(400, ex.StatusCode);
     }
@@ -181,7 +233,7 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetRawResponse("{\"message\":\"bad key\"}", HttpStatusCode.Unauthorized);
 
-        await Assert.ThrowsAsync<UnauthorizedException>(() => client.Wallets.CurrentAsync());
+        await Assert.ThrowsAsync<UnauthorizedException>(() => client.Wallet("wal_1").GetAsync());
     }
 
     [Fact]
@@ -190,7 +242,7 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetRawResponse("{\"message\":\"denied\"}", HttpStatusCode.Forbidden);
 
-        await Assert.ThrowsAsync<ForbiddenException>(() => client.Wallets.CurrentAsync());
+        await Assert.ThrowsAsync<ForbiddenException>(() => client.Wallet("wal_1").GetAsync());
     }
 
     [Fact]
@@ -199,7 +251,7 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetRawResponse("{\"message\":\"not found\"}", HttpStatusCode.NotFound);
 
-        await Assert.ThrowsAsync<NotFoundException>(() => client.Wallets.CurrentAsync());
+        await Assert.ThrowsAsync<NotFoundException>(() => client.Wallet("wal_1").GetAsync());
     }
 
     [Fact]
@@ -208,7 +260,7 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetRawResponse("{\"message\":\"conflict\"}", HttpStatusCode.Conflict);
 
-        await Assert.ThrowsAsync<ConflictException>(() => client.Wallets.CurrentAsync());
+        await Assert.ThrowsAsync<ConflictException>(() => client.Wallet("wal_1").GetAsync());
     }
 
     [Fact]
@@ -217,7 +269,7 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetRawResponse("{\"error\":\"server error\"}", HttpStatusCode.InternalServerError);
 
-        var ex = await Assert.ThrowsAsync<LnBotException>(() => client.Wallets.CurrentAsync());
+        var ex = await Assert.ThrowsAsync<LnBotException>(() => client.Wallet("wal_1").GetAsync());
         Assert.Equal(500, ex.StatusCode);
     }
 
@@ -227,7 +279,7 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetRawResponse("{\"message\":\"invalid amount\"}", HttpStatusCode.BadRequest);
 
-        var ex = await Assert.ThrowsAsync<BadRequestException>(() => client.Wallets.CurrentAsync());
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => client.Wallet("wal_1").GetAsync());
         Assert.Equal("invalid amount", ex.Message);
     }
 
@@ -237,7 +289,7 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetRawResponse("{\"error\":\"bad input\"}", HttpStatusCode.BadRequest);
 
-        var ex = await Assert.ThrowsAsync<BadRequestException>(() => client.Wallets.CurrentAsync());
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => client.Wallet("wal_1").GetAsync());
         Assert.Equal("bad input", ex.Message);
     }
 
@@ -247,7 +299,7 @@ public class ClientTests
         var (client, handler) = TestHelper.CreateClient();
         handler.SetRawResponse("{\"message\":\"fail\",\"details\":\"extra\"}", HttpStatusCode.BadRequest);
 
-        var ex = await Assert.ThrowsAsync<BadRequestException>(() => client.Wallets.CurrentAsync());
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => client.Wallet("wal_1").GetAsync());
         Assert.Contains("extra", ex.Body);
     }
 
@@ -264,6 +316,6 @@ public class ClientTests
 
         // If HttpClient was disposed, this would throw
         handler.SetResponse(new { walletId = "wal_1", name = "n", balance = 0, onHold = 0, available = 0 });
-        Assert.NotNull(http.GetAsync("https://api.ln.bot/v1/wallets/current"));
+        Assert.NotNull(http.GetAsync("https://api.ln.bot/v1/wallets/wal_1"));
     }
 }
