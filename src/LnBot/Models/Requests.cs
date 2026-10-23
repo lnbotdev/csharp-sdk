@@ -61,6 +61,12 @@ public sealed class CreatePaymentRequest
     [JsonPropertyName("idempotencyKey")]
     public string? IdempotencyKey { get; set; }
 
+    /// <summary>
+    /// Maximum network fee in sats: Spark's 0.25% plus Lightning routing. Leave null to use the server default
+    /// (1% of the amount, minimum 20 sats); avoid hard-coding a small value, which rejects larger payments.
+    /// Accepted range is 1 to max(10,000, 5% of the amount). Only the fee estimate plus a small buffer is held
+    /// while the payment is in flight. Ignored for internal transfers.
+    /// </summary>
     [JsonPropertyName("maxFee")]
     public long? MaxFee { get; set; }
 
@@ -146,6 +152,11 @@ public sealed class PayL402Request
     [JsonPropertyName("wwwAuthenticate")]
     public required string WwwAuthenticate { get; set; }
 
+    /// <summary>
+    /// Maximum network fee in sats: Spark's 0.25% plus Lightning routing. Same default and limits as
+    /// <see cref="CreatePaymentRequest.MaxFee"/>: leave null to use the server default (1% of the amount,
+    /// minimum 20 sats).
+    /// </summary>
     [JsonPropertyName("maxFee")]
     public long? MaxFee { get; set; }
 

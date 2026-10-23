@@ -13,7 +13,7 @@ namespace LnBot;
 /// </summary>
 public sealed class LnBotClient : ILnBotClient
 {
-    internal const string Version = "1.0.0";
+    internal const string Version = "1.1.0";
     internal static readonly string DefaultBaseUrl = "https://api.ln.bot";
 
     private static readonly JsonSerializerOptions JsonOptions = new()

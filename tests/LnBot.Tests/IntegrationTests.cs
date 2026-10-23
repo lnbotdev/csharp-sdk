@@ -645,7 +645,6 @@ public class IntegrationTests : IAsyncLifetime
         var payResult = await w2.L402.PayAsync(new PayL402Request
         {
             WwwAuthenticate = challenge.WwwAuthenticate,
-            MaxFee = 1,
             Wait = true,
             Timeout = 30,
         });

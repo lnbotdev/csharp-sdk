@@ -112,6 +112,19 @@ public class ClientTests
     }
 
     [Fact]
+    public async Task UserAgentVersion_MatchesPackageVersion()
+    {
+        var (client, handler) = TestHelper.CreateClient();
+        handler.SetResponse(new { walletId = "wal_1", name = "Test", balance = 0, onHold = 0, available = 0 });
+
+        await client.Wallet("wal_1").GetAsync();
+
+        var version = typeof(LnBotClient).Assembly.GetName().Version!.ToString(3);
+        Assert.Equal("1.1.0", version);
+        Assert.Contains($"lnbot-csharp/{version}", handler.LastRequest!.Headers.UserAgent.ToString());
+    }
+
+    [Fact]
     public async Task SendsJsonContentType_ForPostWithBody()
     {
         var (client, handler) = TestHelper.CreateClient();

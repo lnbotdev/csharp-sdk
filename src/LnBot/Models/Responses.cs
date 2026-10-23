@@ -165,12 +165,22 @@ public sealed class PaymentResponse
     [JsonPropertyName("amount")]
     public required long Amount { get; init; }
 
+    /// <summary>
+    /// Network fee reserved for this payment in sats: the fee estimate plus a small buffer, or the max fee when
+    /// no estimate was available. Never above <see cref="CreatePaymentRequest.MaxFee"/>. The unused part is
+    /// released at settlement.
+    /// </summary>
     [JsonPropertyName("maxFee")]
     public required long MaxFee { get; init; }
 
+    /// <summary>Service fee in sats: 0.25%, minimum 1 sat. 0 for internal transfers.</summary>
     [JsonPropertyName("serviceFee")]
     public required long ServiceFee { get; init; }
 
+    /// <summary>
+    /// Network fee actually charged in sats (Spark's fee plus Lightning routing). Null until settled.
+    /// On success the wallet is debited <see cref="Amount"/> + <see cref="ActualFee"/> + <see cref="ServiceFee"/>.
+    /// </summary>
     [JsonPropertyName("actualFee")]
     public long? ActualFee { get; init; }
 
@@ -198,20 +208,71 @@ public sealed class PaymentResponse
 
 public sealed class ResolveTargetResponse
 {
+    /// <summary>Target type: <c>lightning_address</c>, <c>lnurl</c> or <c>bolt11</c>.</summary>
     [JsonPropertyName("type")]
     public required string Type { get; init; }
 
+    /// <summary>Minimum accepted amount in sats. Null for BOLT11 invoices.</summary>
     [JsonPropertyName("min")]
     public long? Min { get; init; }
 
+    /// <summary>Maximum accepted amount in sats. Null for BOLT11 invoices.</summary>
     [JsonPropertyName("max")]
     public long? Max { get; init; }
 
+    /// <summary>True if the recipient expects a fixed amount.</summary>
     [JsonPropertyName("fixed")]
     public bool? Fixed { get; init; }
 
+    /// <summary>
+    /// The amount priced in sats: the invoice amount for a BOLT11 invoice, otherwise the amount passed.
+    /// Null when no amount was given.
+    /// </summary>
     [JsonPropertyName("amount")]
     public long? Amount { get; init; }
+
+    /// <summary>True when the recipient is a wallet on ln.bot: a free internal transfer.</summary>
+    [JsonPropertyName("internal")]
+    public bool Internal { get; init; }
+
+    /// <summary>
+    /// Estimated network fee in sats (Spark's 0.25% plus Lightning routing).
+    /// Null without an amount or when no estimate is available. 0 for internal transfers.
+    /// </summary>
+    [JsonPropertyName("networkFeeEstimate")]
+    public long? NetworkFeeEstimate { get; init; }
+
+    /// <summary>Service fee in sats: 0.25%, minimum 1 sat. 0 for internal transfers. Null without an amount.</summary>
+    [JsonPropertyName("serviceFee")]
+    public long? ServiceFee { get; init; }
+
+    /// <summary>
+    /// Network fee in sats that would be reserved with the default max fee.
+    /// Null without an amount, or when <see cref="FeeWarning"/> is set.
+    /// </summary>
+    [JsonPropertyName("maxFee")]
+    public long? MaxFee { get; init; }
+
+    /// <summary>
+    /// Expected total cost in sats: <see cref="Amount"/> + <see cref="NetworkFeeEstimate"/> + <see cref="ServiceFee"/>.
+    /// Null without an amount.
+    /// </summary>
+    [JsonPropertyName("total")]
+    public long? Total { get; init; }
+
+    /// <summary>
+    /// For a Lightning address or LNURL resolved without an amount: the most this wallet can send there now,
+    /// after fees. 0 if the wallet can't cover the recipient's minimum. Null otherwise.
+    /// </summary>
+    [JsonPropertyName("maxSendable")]
+    public long? MaxSendable { get; init; }
+
+    /// <summary>
+    /// Set when sending without a max fee would be rejected because the fee is unusually high.
+    /// The resolve call itself still succeeds.
+    /// </summary>
+    [JsonPropertyName("feeWarning")]
+    public string? FeeWarning { get; init; }
 }
 
 // ---------------------------------------------------------------------------
@@ -438,6 +499,7 @@ public sealed class L402PayResponse
     [JsonPropertyName("amount")]
     public required long Amount { get; init; }
 
+    /// <summary>Network fee actually charged in sats (Spark's fee plus Lightning routing). Null until settled.</summary>
     [JsonPropertyName("fee")]
     public long? Fee { get; init; }
 

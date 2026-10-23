@@ -268,6 +268,18 @@ public class PaymentsResourceTests
     }
 
     [Fact]
+    public async Task CreateAsync_OmitsMaxFeeWhenNotSet()
+    {
+        var (client, handler) = TestHelper.CreateClient();
+        handler.SetResponse(new { number = 1, status = "pending", amount = 5000, maxFee = 50, serviceFee = 13, address = "user@ln.bot" });
+
+        await client.Wallet("wal_1").Payments.CreateAsync(new CreatePaymentRequest { Target = "user@ln.bot", Amount = 5000 });
+
+        var body = JsonDocument.Parse(handler.LastRequestBody!);
+        Assert.False(body.RootElement.TryGetProperty("maxFee", out _));
+    }
+
+    [Fact]
     public async Task ListAsync_GetsWalletPayments()
     {
         var (client, handler) = TestHelper.CreateClient();
@@ -313,11 +325,28 @@ public class PaymentsResourceTests
         Assert.EndsWith("/v1/wallets/wal_1/payments/hash123", handler.LastRequest!.RequestUri!.AbsolutePath);
     }
 
+    private const string LightningAddressWithoutAmountJson = """
+        {
+          "type": "lightning_address",
+          "min": 1,
+          "max": 1000000,
+          "fixed": false,
+          "amount": null,
+          "internal": false,
+          "networkFeeEstimate": null,
+          "serviceFee": null,
+          "maxFee": null,
+          "total": null,
+          "maxSendable": 48700,
+          "feeWarning": null
+        }
+        """;
+
     [Fact]
     public async Task ResolveAsync_GetsPaymentsResolve()
     {
         var (client, handler) = TestHelper.CreateClient();
-        handler.SetResponse(new { type = "lightning_address", min = 1, max = 1000000 });
+        handler.SetRawResponse(LightningAddressWithoutAmountJson);
 
         var result = await client.Wallet("wal_1").Payments.ResolveAsync("user@ln.bot");
 
@@ -325,6 +354,107 @@ public class PaymentsResourceTests
         Assert.Contains("/v1/wallets/wal_1/payments/resolve", handler.LastRequest.RequestUri!.AbsolutePath);
         Assert.Contains("target=user%40ln.bot", handler.LastRequest.RequestUri!.Query);
         Assert.Equal("lightning_address", result.Type);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_OmitsAmountWhenNotGiven()
+    {
+        var (client, handler) = TestHelper.CreateClient();
+        handler.SetRawResponse(LightningAddressWithoutAmountJson);
+
+        await client.Wallet("wal_1").Payments.ResolveAsync("user@ln.bot", CancellationToken.None);
+
+        Assert.Equal("?target=user%40ln.bot", handler.LastRequest!.RequestUri!.Query);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_WithAmount_SendsAmountInQuery()
+    {
+        var (client, handler) = TestHelper.CreateClient();
+        handler.SetRawResponse("""
+            {"type":"lightning_address","min":1,"max":1000000,"fixed":false,"amount":5000,"internal":false,"networkFeeEstimate":15,"serviceFee":13,"maxFee":50,"total":5028,"maxSendable":null,"feeWarning":null}
+            """);
+
+        var result = await client.Wallet("wal_1").Payments.ResolveAsync("user@ln.bot", 5000);
+
+        Assert.Equal(HttpMethod.Get, handler.LastRequest!.Method);
+        Assert.EndsWith("/v1/wallets/wal_1/payments/resolve", handler.LastRequest.RequestUri!.AbsolutePath);
+        Assert.Equal("?target=user%40ln.bot&amount=5000", handler.LastRequest.RequestUri!.Query);
+        Assert.Equal(5000, result.Amount);
+        Assert.Equal(5028, result.Total);
+        Assert.Null(result.MaxSendable);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_LightningAddressWithoutAmount_ReturnsMaxSendable()
+    {
+        var (client, handler) = TestHelper.CreateClient();
+        handler.SetRawResponse(LightningAddressWithoutAmountJson);
+
+        var result = await client.Wallet("wal_1").Payments.ResolveAsync("user@ln.bot");
+
+        Assert.Equal("lightning_address", result.Type);
+        Assert.Equal(48700, result.MaxSendable);
+        Assert.Null(result.Amount);
+        Assert.Null(result.NetworkFeeEstimate);
+        Assert.Null(result.ServiceFee);
+        Assert.Null(result.MaxFee);
+        Assert.Null(result.Total);
+        Assert.Null(result.FeeWarning);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_DeserializesPricingFields()
+    {
+        var (client, handler) = TestHelper.CreateClient();
+        handler.SetRawResponse("""
+            {
+              "type": "bolt11",
+              "min": null,
+              "max": null,
+              "fixed": true,
+              "amount": 250000,
+              "internal": false,
+              "networkFeeEstimate": 700,
+              "serviceFee": 625,
+              "maxFee": 805,
+              "total": 251325,
+              "maxSendable": null,
+              "feeWarning": null
+            }
+            """);
+
+        var result = await client.Wallet("wal_1").Payments.ResolveAsync("lnbc2500u1...");
+
+        Assert.Equal("bolt11", result.Type);
+        Assert.Null(result.Min);
+        Assert.Null(result.Max);
+        Assert.True(result.Fixed);
+        Assert.Equal(250000, result.Amount);
+        Assert.False(result.Internal);
+        Assert.Equal(700, result.NetworkFeeEstimate);
+        Assert.Equal(625, result.ServiceFee);
+        Assert.Equal(805, result.MaxFee);
+        Assert.Equal(251325, result.Total);
+        Assert.Null(result.MaxSendable);
+        Assert.Null(result.FeeWarning);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_DeserializesInternalAndFeeWarning()
+    {
+        var (client, handler) = TestHelper.CreateClient();
+        handler.SetRawResponse("""
+            {"type":"lightning_address","min":1,"max":1000000,"fixed":false,"amount":1000,"internal":true,"networkFeeEstimate":0,"serviceFee":0,"maxFee":null,"total":1000,"maxSendable":null,"feeWarning":"Network fee is unusually high."}
+            """);
+
+        var result = await client.Wallet("wal_1").Payments.ResolveAsync("user@ln.bot", 1000);
+
+        Assert.True(result.Internal);
+        Assert.Equal(0, result.NetworkFeeEstimate);
+        Assert.Equal(0, result.ServiceFee);
+        Assert.Null(result.MaxFee);
+        Assert.Equal("Network fee is unusually high.", result.FeeWarning);
     }
 }
 
@@ -580,5 +710,7 @@ public class L402ResourceTests
 
         Assert.Equal(HttpMethod.Post, handler.LastRequest!.Method);
         Assert.EndsWith("/v1/wallets/wal_1/l402/pay", handler.LastRequest.RequestUri!.AbsolutePath);
+        var body = JsonDocument.Parse(handler.LastRequestBody!);
+        Assert.False(body.RootElement.TryGetProperty("maxFee", out _));
     }
 }

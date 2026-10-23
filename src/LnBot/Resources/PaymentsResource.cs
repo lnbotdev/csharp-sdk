@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using LnBot.Models;
@@ -43,10 +44,23 @@ public sealed class PaymentsResource
         => _client.GetAsync<PaymentResponse>($"{_prefix}/payments/{Uri.EscapeDataString(paymentHash)}", cancellationToken);
 
     /// <summary>
-    /// Resolves a payment target and returns info about the destination (type, min/max amounts, etc.).
+    /// Resolves a payment target without paying it: type, min/max amounts and pricing.
+    /// A BOLT11 invoice is priced at its own amount. A Lightning address or LNURL returns
+    /// <see cref="ResolveTargetResponse.MaxSendable"/>, the most this wallet can send there now.
     /// </summary>
     public Task<ResolveTargetResponse> ResolveAsync(string target, CancellationToken cancellationToken = default)
-        => _client.GetAsync<ResolveTargetResponse>($"{_prefix}/payments/resolve?target={Uri.EscapeDataString(target)}", cancellationToken);
+        => _client.GetAsync<ResolveTargetResponse>(BuildResolvePath(target, null), cancellationToken);
+
+    /// <summary>
+    /// Resolves a payment target and prices a payment of <paramref name="amount"/> sats without paying it:
+    /// network fee estimate, service fee, reserved fee and total.
+    /// Pricing a Lightning address or LNURL requests an invoice from the recipient, so call it once the amount is settled.
+    /// </summary>
+    /// <param name="target">Lightning address, LNURL, or BOLT11 invoice.</param>
+    /// <param name="amount">Amount in sats to price. For a BOLT11 invoice it must equal the invoice amount.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public Task<ResolveTargetResponse> ResolveAsync(string target, long amount, CancellationToken cancellationToken = default)
+        => _client.GetAsync<ResolveTargetResponse>(BuildResolvePath(target, amount), cancellationToken);
 
     /// <summary>
     /// Opens an SSE stream that emits when the payment settles or fails.
@@ -96,6 +110,13 @@ public sealed class PaymentsResource
             catch (JsonException) { continue; }
             if (evt is not null) yield return evt;
         }
+    }
+
+    private string BuildResolvePath(string target, long? amount)
+    {
+        var path = $"{_prefix}/payments/resolve?target={Uri.EscapeDataString(target)}";
+        if (amount.HasValue) path += $"&amount={amount.Value.ToString(CultureInfo.InvariantCulture)}";
+        return path;
     }
 
     private string BuildListPath(PaginationParams? pagination)

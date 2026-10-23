@@ -80,6 +80,8 @@ await foreach (var evt in w.Invoices.WatchAsync(invoice.Number))
 }
 ```
 
+An `expired` invoice is not always final: one paid just before it expired can still turn `settled` afterwards. Before giving up, check again with `w.Invoices.GetAsync(invoice.Number)`, or keep listening for `invoice.settled` on `w.Events.StreamAsync()` or a webhook.
+
 ### Send sats
 
 ```csharp
@@ -90,12 +92,90 @@ var payment = await w.Payments.CreateAsync(new CreatePaymentRequest
 });
 ```
 
+Leave `MaxFee` unset so the server default applies (see [Payment fees](#payment-fees)). A payment can stay `pending` for a while because it is retried automatically. Retries stop when the invoice expires (failure reason `Invoice expired before it could be paid.`) or after 24 hours at most. A failing payment can also stay `processing` a few seconds before it turns `failed`. Use `w.Payments.WatchAsync(payment.Number)` or `GetAsync` to follow it.
+
 ### Check balance
 
 ```csharp
 var info = await w.GetAsync();
 Console.WriteLine($"{info.Available} sats available");
 ```
+
+---
+
+## Payment fees
+
+A payment to an external wallet costs `Amount + ActualFee + ServiceFee`:
+
+- `ActualFee` is the network fee actually charged: Spark's 0.25% plus Lightning routing.
+- `ServiceFee` is 0.25%, minimum 1 sat.
+- Transfers to another ln.bot wallet are free.
+
+`MaxFee` caps the network fee. Leave it unset: the default is 1% of the amount, minimum 20 sats, and only the fee estimate plus a small buffer is held while the payment is in flight. A small hard-coded value rejects most larger payments. If the estimate is above the default limit, `CreateAsync` throws `BadRequestException` and you can set `MaxFee` to allow a higher fee.
+
+### Show fees before paying
+
+`ResolveAsync` prices a payment without sending anything. Pass the amount for a Lightning address or LNURL; a BOLT11 invoice is priced at its own amount.
+
+```csharp
+var quote = await w.Payments.ResolveAsync("alice@ln.bot", 5000);
+
+Console.WriteLine($"Network fee: ~{quote.NetworkFeeEstimate} sats");
+Console.WriteLine($"Service fee: {quote.ServiceFee} sats");
+Console.WriteLine($"Total: {quote.Total} sats");
+
+if (quote.FeeWarning is not null)
+{
+    // Sending without MaxFee would be rejected: the fee is unusually high
+    Console.WriteLine(quote.FeeWarning);
+}
+```
+
+Pricing a Lightning address or LNURL fetches an invoice from the recipient, so it is slower. Call it once the amount is settled, not on every keystroke.
+
+### Send everything
+
+Resolve a Lightning address or LNURL **without** an amount to get `MaxSendable`, the most this wallet can send there now after fees. Then send exactly that, without `MaxFee`:
+
+```csharp
+var target = "alice@ln.bot";
+var info = await w.Payments.ResolveAsync(target);
+
+if (info.MaxSendable is > 0)
+{
+    await w.Payments.CreateAsync(new CreatePaymentRequest
+    {
+        Target = target,
+        Amount = info.MaxSendable,
+    });
+}
+```
+
+`MaxSendable` is 0 when the wallet can't cover the recipient's minimum.
+
+### Resolve errors
+
+Resolve throws `BadRequestException` when the target can't be priced. When the amount is outside the recipient's range, `ex.Body` is `{ "error", "min", "max" }`:
+
+```csharp
+using System.Text.Json;
+using LnBot.Exceptions;
+
+try
+{
+    var quote = await w.Payments.ResolveAsync("alice@ln.bot", 5000);
+}
+catch (BadRequestException ex)
+{
+    Console.WriteLine(ex.Message);
+
+    using var body = JsonDocument.Parse(ex.Body);
+    if (body.RootElement.TryGetProperty("min", out var min) && body.RootElement.TryGetProperty("max", out var max))
+        Console.WriteLine($"Amount must be between {min} and {max} sats");
+}
+```
+
+An unknown ln.bot address fails with `Recipient not found.` and your own address with `Cannot transfer to yourself.`
 
 ---
 
@@ -113,7 +193,7 @@ await w.UpdateAsync(new UpdateWalletRequest { Name = "production" });
 // Sub-resources
 w.Key          // Wallet key management (wk_ keys)
 w.Invoices     // Create, list, get, watch invoices
-w.Payments     // Send, list, get, watch, resolve payments
+w.Payments     // Send, list, get, watch payments; resolve and price targets
 w.Addresses    // Create, list, delete, transfer Lightning addresses
 w.Transactions // List transaction history
 w.Webhooks     // Create, list, delete webhook endpoints
@@ -195,7 +275,8 @@ var challenge = await w.L402.CreateChallengeAsync(new CreateL402ChallengeRequest
     ExpirySeconds = 3600,
 });
 
-// Pay the challenge (client side)
+// Pay the challenge (client side). MaxFee works as for payments: leave it unset.
+// result.Fee is the network fee actually charged.
 var result = await w.L402.PayAsync(new PayL402Request
 {
     WwwAuthenticate = challenge.WwwAuthenticate,
