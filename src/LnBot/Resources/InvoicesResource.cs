@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using LnBot.Models;
 
 namespace LnBot.Resources;
@@ -44,6 +43,9 @@ public sealed class InvoicesResource
 
     /// <summary>
     /// Opens an SSE stream that emits when the invoice settles or expires.
+    /// If the wait runs out first (<paramref name="timeout"/> seconds, default 60, max 300), it emits a
+    /// <c>timeout</c> event whose data is the invoice's current state; read it again or watch again.
+    /// An event that can't be decoded is skipped.
     /// </summary>
     public async IAsyncEnumerable<InvoiceEvent> WatchAsync(int number, int? timeout = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -51,24 +53,19 @@ public sealed class InvoicesResource
         if (timeout.HasValue) path += $"?timeout={timeout.Value}";
 
         await using var stream = await _client.GetStreamAsync(path, cancellationToken).ConfigureAwait(false);
-        using var reader = new StreamReader(stream);
 
-        while (!cancellationToken.IsCancellationRequested)
+        await foreach (var message in ServerSentEvents.ReadAsync(stream, cancellationToken).ConfigureAwait(false))
         {
-            var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
-            if (line is null) break;
-            if (!line.StartsWith("data: ")) continue;
-
-            var json = line["data: ".Length..];
-            InvoiceEvent? evt;
-            try { evt = JsonSerializer.Deserialize<InvoiceEvent>(json, LnBotClient.GetJsonOptions()); }
-            catch (JsonException) { continue; }
-            if (evt is not null) yield return evt;
+            if (!ServerSentEvents.TryDeserializeWatchEvent<InvoiceResponse>(message, out var name, out var data)) continue;
+            yield return new InvoiceEvent { Event = name, Data = data };
         }
     }
 
     /// <summary>
     /// Opens an SSE stream by payment hash that emits when the invoice settles or expires.
+    /// If the wait runs out first (<paramref name="timeout"/> seconds, default 60, max 300), it emits a
+    /// <c>timeout</c> event whose data is the invoice's current state; read it again or watch again.
+    /// An event that can't be decoded is skipped.
     /// </summary>
     public async IAsyncEnumerable<InvoiceEvent> WatchByHashAsync(string paymentHash, int? timeout = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -76,19 +73,11 @@ public sealed class InvoicesResource
         if (timeout.HasValue) path += $"?timeout={timeout.Value}";
 
         await using var stream = await _client.GetStreamAsync(path, cancellationToken).ConfigureAwait(false);
-        using var reader = new StreamReader(stream);
 
-        while (!cancellationToken.IsCancellationRequested)
+        await foreach (var message in ServerSentEvents.ReadAsync(stream, cancellationToken).ConfigureAwait(false))
         {
-            var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
-            if (line is null) break;
-            if (!line.StartsWith("data: ")) continue;
-
-            var json = line["data: ".Length..];
-            InvoiceEvent? evt;
-            try { evt = JsonSerializer.Deserialize<InvoiceEvent>(json, LnBotClient.GetJsonOptions()); }
-            catch (JsonException) { continue; }
-            if (evt is not null) yield return evt;
+            if (!ServerSentEvents.TryDeserializeWatchEvent<InvoiceResponse>(message, out var name, out var data)) continue;
+            yield return new InvoiceEvent { Event = name, Data = data };
         }
     }
 

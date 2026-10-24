@@ -20,23 +20,18 @@ public sealed class EventsResource
 
     /// <summary>
     /// Opens a Server-Sent Events stream for real-time wallet notifications.
+    /// Events: <c>invoice.created</c>, <c>invoice.settled</c>, <c>payment.created</c>, <c>payment.settled</c>
+    /// and <c>payment.failed</c>. See <see cref="WalletEvent.Data"/> for the payload.
+    /// An event that can't be decoded is skipped.
     /// </summary>
     public async IAsyncEnumerable<WalletEvent> StreamAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await using var stream = await _client.GetStreamAsync($"{_prefix}/events", cancellationToken).ConfigureAwait(false);
-        using var reader = new StreamReader(stream);
 
-        while (!cancellationToken.IsCancellationRequested)
+        await foreach (var message in ServerSentEvents.ReadAsync(stream, cancellationToken).ConfigureAwait(false))
         {
-            var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
-            if (line is null) break;
-            if (!line.StartsWith("data: ")) continue;
-
-            var json = line["data: ".Length..];
-            WalletEvent? evt;
-            try { evt = JsonSerializer.Deserialize<WalletEvent>(json, LnBotClient.GetJsonOptions()); }
-            catch (JsonException) { continue; }
-            if (evt is not null) yield return evt;
+            if (!ServerSentEvents.TryDeserialize<WalletEvent>(message, out var walletEvent)) continue;
+            yield return walletEvent;
         }
     }
 }

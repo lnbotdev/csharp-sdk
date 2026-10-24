@@ -120,7 +120,7 @@ public class ClientTests
         await client.Wallet("wal_1").GetAsync();
 
         var version = typeof(LnBotClient).Assembly.GetName().Version!.ToString(3);
-        Assert.Equal("1.1.0", version);
+        Assert.Equal("1.1.1", version);
         Assert.Contains($"lnbot-csharp/{version}", handler.LastRequest!.Headers.UserAgent.ToString());
     }
 

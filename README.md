@@ -80,6 +80,10 @@ await foreach (var evt in w.Invoices.WatchAsync(invoice.Number))
 }
 ```
 
+If the wait runs out first (`timeout` seconds, default 60, max 300), the stream yields a `timeout` event whose `evt.Data` is the invoice's current state; read it again or watch again.
+
+Event and webhook payloads use snake_case on the wire (`actual_fee`, `created_at`); the SDK converts events to the camelCase fields of REST responses, while a webhook handler receives the snake_case names.
+
 An `expired` invoice is not always final: one paid just before it expired can still turn `settled` afterwards. Before giving up, check again with `w.Invoices.GetAsync(invoice.Number)`, or keep listening for `invoice.settled` on `w.Events.StreamAsync()` or a webhook.
 
 ### Send sats
