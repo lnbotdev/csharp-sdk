@@ -120,7 +120,7 @@ public class ClientTests
         await client.Wallet("wal_1").GetAsync();
 
         var version = typeof(LnBotClient).Assembly.GetName().Version!.ToString(3);
-        Assert.Equal("1.1.1", version);
+        Assert.Equal("1.2.0", version);
         Assert.Contains($"lnbot-csharp/{version}", handler.LastRequest!.Headers.UserAgent.ToString());
     }
 
@@ -274,6 +274,17 @@ public class ClientTests
         handler.SetRawResponse("{\"message\":\"conflict\"}", HttpStatusCode.Conflict);
 
         await Assert.ThrowsAsync<ConflictException>(() => client.Wallet("wal_1").GetAsync());
+    }
+
+    [Fact]
+    public async Task Throws_TooManyRequestsException_For429()
+    {
+        var (client, handler) = TestHelper.CreateClient();
+        handler.SetRawResponse("{\"error\":\"Too many requests. Please try again later.\"}", HttpStatusCode.TooManyRequests);
+
+        var ex = await Assert.ThrowsAsync<TooManyRequestsException>(() => client.Wallet("wal_1").GetAsync());
+        Assert.Equal("Too many requests. Please try again later.", ex.Message);
+        Assert.Equal(429, ex.StatusCode);
     }
 
     [Fact]

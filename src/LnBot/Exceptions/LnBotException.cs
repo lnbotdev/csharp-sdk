@@ -45,3 +45,12 @@ public sealed class ConflictException : LnBotException
 {
     public ConflictException(string message, string body) : base(409, message, body) { }
 }
+
+/// <summary>
+/// Thrown when the API returns 429 Too Many Requests: the caller is over a rate limit, such as the
+/// 10 requests a minute per IP that the status calls share with the API's other public routes. Wait and try again.
+/// </summary>
+public sealed class TooManyRequestsException : LnBotException
+{
+    public TooManyRequestsException(string message, string body) : base(429, message, body) { }
+}

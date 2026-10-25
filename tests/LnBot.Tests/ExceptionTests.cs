@@ -51,4 +51,12 @@ public class ExceptionTests
         var ex = new ConflictException("conflict", "body");
         Assert.Equal(409, ex.StatusCode);
     }
+
+    [Fact]
+    public void TooManyRequestsException_HasStatus429()
+    {
+        var ex = new TooManyRequestsException("slow down", "body");
+        Assert.Equal(429, ex.StatusCode);
+        Assert.IsAssignableFrom<LnBotException>(ex);
+    }
 }

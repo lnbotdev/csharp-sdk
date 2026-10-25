@@ -324,6 +324,63 @@ public class PaymentWatchTests
     }
 
     [Fact]
+    public async Task WatchAsync_DecodesStageFieldsInTimeoutEvent()
+    {
+        var sse = $"event: timeout\ndata: {TestHelper.Fixture("payment-timeout-event.json")}\n\n";
+        var (client, _) = TestHelper.CreateSseClient(sse);
+
+        var events = new List<PaymentEvent>();
+        await foreach (var evt in client.Wallet("wal_1").Payments.WatchAsync(4, timeout: 1))
+            events.Add(evt);
+
+        var e = Assert.Single(events);
+        Assert.Equal("timeout", e.Event);
+        Assert.Equal(PaymentStatus.Processing, e.Data.Status);
+        Assert.Equal(PaymentStage.InFlight, e.Data.Stage);
+        Assert.Equal("Sent; the Lightning network is completing it, usually within seconds.", e.Data.StatusDetail);
+        Assert.Null(e.Data.RetryUntil);
+        Assert.Equal(20, e.Data.MaxFee);
+        Assert.Equal(3, e.Data.ServiceFee);
+        Assert.Equal(new DateTimeOffset(2026, 10, 25, 14, 33, 53, TimeSpan.Zero), e.Data.CreatedAt);
+    }
+
+    [Fact]
+    public async Task WatchAsync_DecodesSnakeCaseRetryUntil()
+    {
+        var sse =
+            "event: timeout\n" +
+            "data: {\"number\":4,\"status\":\"pending\",\"amount\":1000,\"max_fee\":20,\"service_fee\":3,\"actual_fee\":null,\"address\":\"lnbc10u1p...\",\"reference\":null,\"preimage\":null,\"tx_number\":null,\"failure_reason\":null,\"created_at\":\"2026-10-25T14:33:53+00:00\",\"settled_at\":null,\"stage\":\"retrying\",\"status_detail\":\"Not sent yet; retrying for a few minutes. If it still can't be sent, it fails and the funds are released.\",\"retry_until\":\"2026-10-25T14:43:53+00:00\"}\n\n";
+        var (client, _) = TestHelper.CreateSseClient(sse);
+
+        var events = new List<PaymentEvent>();
+        await foreach (var evt in client.Wallet("wal_1").Payments.WatchAsync(4, timeout: 1))
+            events.Add(evt);
+
+        var e = Assert.Single(events);
+        Assert.Equal(PaymentStatus.Pending, e.Data.Status);
+        Assert.Equal(PaymentStage.Retrying, e.Data.Stage);
+        Assert.StartsWith("Not sent yet;", e.Data.StatusDetail);
+        Assert.Equal(new DateTimeOffset(2026, 10, 25, 14, 43, 53, TimeSpan.Zero), e.Data.RetryUntil);
+    }
+
+    [Fact]
+    public async Task WatchAsync_KeepsUnknownStage()
+    {
+        var sse =
+            "event: timeout\n" +
+            "data: {\"number\":5,\"status\":\"processing\",\"amount\":1000,\"max_fee\":20,\"service_fee\":3,\"address\":\"x4k7m2@ln.bot\",\"stage\":\"teleporting\",\"status_detail\":\"Moving through a new kind of route.\",\"retry_until\":null}\n\n";
+        var (client, _) = TestHelper.CreateSseClient(sse);
+
+        var events = new List<PaymentEvent>();
+        await foreach (var evt in client.Wallet("wal_1").Payments.WatchAsync(5, timeout: 1))
+            events.Add(evt);
+
+        var e = Assert.Single(events);
+        Assert.Equal("teleporting", e.Data.Stage);
+        Assert.Equal(PaymentStatus.Processing, e.Data.Status);
+    }
+
+    [Fact]
     public async Task WatchAsync_DecodesCamelCasePayload()
     {
         var sse =

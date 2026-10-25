@@ -111,4 +111,17 @@ internal static class TestHelper
         var client = new LnBotClient(apiKey, new LnBotClientOptions { HttpClient = http });
         return (client, handler);
     }
+
+    /// <summary>Creates a client with no API key, as for the public routes.</summary>
+    public static (LnBotClient Client, MockHandler Handler) CreateClientWithoutKey()
+    {
+        var handler = new MockHandler();
+        var http = new HttpClient(handler) { BaseAddress = new Uri("https://api.ln.bot") };
+        var client = new LnBotClient(null, new LnBotClientOptions { HttpClient = http });
+        return (client, handler);
+    }
+
+    /// <summary>Reads a response body saved in the Fixtures folder, without its trailing newline.</summary>
+    public static string Fixture(string name)
+        => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", name)).TrimEnd();
 }

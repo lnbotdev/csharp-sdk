@@ -28,6 +28,397 @@ public sealed class MeResponse
 }
 
 // ---------------------------------------------------------------------------
+// Service status
+//
+// Every state and level is an open string (see ServiceState and NoticeLevel), and no property is
+// required, so a response with new values or without some fields still deserializes.
+// ---------------------------------------------------------------------------
+
+/// <summary>The service's status right now, from <see cref="LnBotClient.GetStatusAsync"/>. Measured about once a minute.</summary>
+public sealed class ServiceStatusResponse
+{
+    /// <summary>
+    /// Overall status: one of the <see cref="ServiceState"/> values. <c>unknown</c> when it hasn't been measured for
+    /// 5 minutes; the numbers are then as old as <see cref="UpdatedAt"/>.
+    /// </summary>
+    [JsonPropertyName("status")]
+    public string Status { get; init; } = "";
+
+    /// <summary>When it was measured. Null if never.</summary>
+    [JsonPropertyName("updatedAt")]
+    public DateTimeOffset? UpdatedAt { get; init; }
+
+    /// <summary>A message from the operators, or null.</summary>
+    [JsonPropertyName("notice")]
+    public ServiceNotice? Notice { get; init; }
+
+    [JsonPropertyName("components")]
+    public ServiceComponents Components { get; init; } = new();
+}
+
+/// <summary>A message from the operators.</summary>
+public sealed class ServiceNotice
+{
+    /// <summary>
+    /// One of the <see cref="NoticeLevel"/> values: <c>info</c> (no effect on the status), <c>warning</c>
+    /// (overall at least <c>degraded</c>) or <c>outage</c> (overall <c>outage</c>).
+    /// </summary>
+    [JsonPropertyName("level")]
+    public string Level { get; init; } = "";
+
+    /// <summary>Up to 500 characters, to show as is.</summary>
+    [JsonPropertyName("message")]
+    public string Message { get; init; } = "";
+
+    /// <summary>When it was posted.</summary>
+    [JsonPropertyName("since")]
+    public DateTimeOffset Since { get; init; }
+
+    /// <summary>When it was taken down. Always null in <see cref="ServiceStatusResponse.Notice"/>, and null in the history while it is still up.</summary>
+    [JsonPropertyName("until")]
+    public DateTimeOffset? Until { get; init; }
+}
+
+/// <summary>The status of each part of the service.</summary>
+public sealed class ServiceComponents
+{
+    /// <summary>Lightning payments out.</summary>
+    [JsonPropertyName("sending")]
+    public SendingComponent Sending { get; init; } = new();
+
+    /// <summary>Payments in.</summary>
+    [JsonPropertyName("receiving")]
+    public ReceivingComponent Receiving { get; init; } = new();
+
+    /// <summary>The Lightning node.</summary>
+    [JsonPropertyName("node")]
+    public NodeComponent Node { get; init; } = new();
+
+    /// <summary>Webhook delivery.</summary>
+    [JsonPropertyName("webhooks")]
+    public WebhooksComponent Webhooks { get; init; } = new();
+}
+
+/// <summary>Lightning payments out.</summary>
+public sealed class SendingComponent
+{
+    /// <summary>One of the <see cref="ServiceState"/> values.</summary>
+    [JsonPropertyName("status")]
+    public string Status { get; init; } = "";
+
+    /// <summary>Payments being sent now.</summary>
+    [JsonPropertyName("inProgress")]
+    public int InProgress { get; init; }
+
+    /// <summary>
+    /// The payments in progress by stage (see <see cref="PaymentStage"/>; more stages may appear).
+    /// Stages with none are left out, so it can be empty.
+    /// </summary>
+    [JsonPropertyName("byStage")]
+    public Dictionary<string, int> ByStage { get; init; } = new();
+
+    /// <summary>How long the oldest payment in progress has waited, in seconds. Null when none is.</summary>
+    [JsonPropertyName("longestWaitSeconds")]
+    public double? LongestWaitSeconds { get; init; }
+
+    /// <summary>Payments sent in the last hour.</summary>
+    [JsonPropertyName("sentLastHour")]
+    public int SentLastHour { get; init; }
+
+    /// <summary>Payments failed in the last hour, for any reason.</summary>
+    [JsonPropertyName("failedLastHour")]
+    public int FailedLastHour { get; init; }
+
+    /// <summary>Of <see cref="FailedLastHour"/>, the ones the service caused. The rest were the invoice's or the route's fault.</summary>
+    [JsonPropertyName("serviceFailuresLastHour")]
+    public int ServiceFailuresLastHour { get; init; }
+
+    /// <summary>Median request-to-settlement time in seconds over the last hour. Null when nothing was sent.</summary>
+    [JsonPropertyName("medianSeconds")]
+    public double? MedianSeconds { get; init; }
+
+    /// <summary>95th percentile request-to-settlement time in seconds over the last hour. Null when nothing was sent.</summary>
+    [JsonPropertyName("p95Seconds")]
+    public double? P95Seconds { get; init; }
+}
+
+/// <summary>Payments in.</summary>
+public sealed class ReceivingComponent
+{
+    /// <summary>One of the <see cref="ServiceState"/> values.</summary>
+    [JsonPropertyName("status")]
+    public string Status { get; init; } = "";
+
+    /// <summary>Incoming payments credited in the last hour.</summary>
+    [JsonPropertyName("creditedLastHour")]
+    public int CreditedLastHour { get; init; }
+
+    /// <summary>Incoming payments waiting to be credited now. Null when not measured.</summary>
+    [JsonPropertyName("creditBacklog")]
+    public long? CreditBacklog { get; init; }
+}
+
+/// <summary>The Lightning node.</summary>
+public sealed class NodeComponent
+{
+    /// <summary>One of the <see cref="ServiceState"/> values.</summary>
+    [JsonPropertyName("status")]
+    public string Status { get; init; } = "";
+
+    /// <summary>How long the node took to answer, in milliseconds. Null when it didn't answer.</summary>
+    [JsonPropertyName("latencyMs")]
+    public long? LatencyMs { get; init; }
+}
+
+/// <summary>Webhook delivery.</summary>
+public sealed class WebhooksComponent
+{
+    /// <summary>One of the <see cref="ServiceState"/> values.</summary>
+    [JsonPropertyName("status")]
+    public string Status { get; init; } = "";
+
+    /// <summary>Deliveries waiting to go out. Null when not measured.</summary>
+    [JsonPropertyName("backlog")]
+    public long? Backlog { get; init; }
+}
+
+/// <summary>
+/// The service over time, from <see cref="LnBotClient.GetStatusHistoryAsync"/>: a summary of the whole range and
+/// one bucket per <see cref="BucketSeconds"/>, aligned to UTC. Don't assume the number of buckets: the last one is
+/// the current bucket, still filling.
+/// </summary>
+public sealed class ServiceStatusHistoryResponse
+{
+    /// <summary>The range: one of the <see cref="StatusRange"/> values.</summary>
+    [JsonPropertyName("range")]
+    public string Range { get; init; } = "";
+
+    /// <summary>The length of each bucket in seconds: 300, 3600, 21600 or 86400.</summary>
+    [JsonPropertyName("bucketSeconds")]
+    public int BucketSeconds { get; init; }
+
+    [JsonPropertyName("from")]
+    public DateTimeOffset From { get; init; }
+
+    [JsonPropertyName("to")]
+    public DateTimeOffset To { get; init; }
+
+    /// <summary>The whole range.</summary>
+    [JsonPropertyName("summary")]
+    public StatusHistorySummary Summary { get; init; } = new();
+
+    /// <summary>The buckets, oldest first.</summary>
+    [JsonPropertyName("buckets")]
+    public List<StatusBucket> Buckets { get; init; } = new();
+
+    /// <summary>The operators' notices that were up during the range, oldest first.</summary>
+    [JsonPropertyName("notices")]
+    public List<ServiceNotice> Notices { get; init; } = new();
+}
+
+/// <summary>The whole range of a <see cref="ServiceStatusHistoryResponse"/>.</summary>
+public sealed class StatusHistorySummary
+{
+    /// <summary>Measurements in the range, about one a minute.</summary>
+    [JsonPropertyName("samples")]
+    public int Samples { get; init; }
+
+    /// <summary>Uptime per part and overall, in percent of measured time.</summary>
+    [JsonPropertyName("uptime")]
+    public StatusUptime Uptime { get; init; } = new();
+
+    /// <summary>Payments sent.</summary>
+    [JsonPropertyName("sent")]
+    public int Sent { get; init; }
+
+    /// <summary>Payments failed, for any reason.</summary>
+    [JsonPropertyName("failed")]
+    public int Failed { get; init; }
+
+    /// <summary>Of <see cref="Failed"/>, the ones the service caused.</summary>
+    [JsonPropertyName("serviceFailures")]
+    public int ServiceFailures { get; init; }
+
+    /// <summary>Incoming payments credited.</summary>
+    [JsonPropertyName("credited")]
+    public int Credited { get; init; }
+
+    /// <summary>Median request-to-settlement time in seconds. Null when nothing was sent.</summary>
+    [JsonPropertyName("medianSeconds")]
+    public double? MedianSeconds { get; init; }
+
+    /// <summary>95th percentile request-to-settlement time in seconds. Null when nothing was sent.</summary>
+    [JsonPropertyName("p95Seconds")]
+    public double? P95Seconds { get; init; }
+
+    /// <summary>
+    /// A histogram of settlement times. Its upper bounds are 1, 2, 3, 5, 10, 20, 30, 60, 120, 300 and 600 seconds;
+    /// the last entry, with a null <see cref="SettleTimeBucket.UpToSeconds"/>, holds anything slower.
+    /// </summary>
+    [JsonPropertyName("settleTimes")]
+    public List<SettleTimeBucket> SettleTimes { get; init; } = new();
+
+    /// <summary>The node's average response time in milliseconds. Null when not measured.</summary>
+    [JsonPropertyName("avgLatencyMs")]
+    public double? AvgLatencyMs { get; init; }
+
+    /// <summary>The node's slowest response time in milliseconds. Null when not measured.</summary>
+    [JsonPropertyName("maxLatencyMs")]
+    public long? MaxLatencyMs { get; init; }
+}
+
+/// <summary>Uptime per part and overall, in percent of measured time.</summary>
+public sealed class StatusUptime
+{
+    [JsonPropertyName("overall")]
+    public UptimePercentages Overall { get; init; } = new();
+
+    [JsonPropertyName("sending")]
+    public UptimePercentages Sending { get; init; } = new();
+
+    [JsonPropertyName("receiving")]
+    public UptimePercentages Receiving { get; init; } = new();
+
+    [JsonPropertyName("node")]
+    public UptimePercentages Node { get; init; } = new();
+
+    [JsonPropertyName("webhooks")]
+    public UptimePercentages Webhooks { get; init; } = new();
+}
+
+/// <summary>Percent of measured time in each state. Null when nothing was measured.</summary>
+public sealed class UptimePercentages
+{
+    [JsonPropertyName("operational")]
+    public double? Operational { get; init; }
+
+    [JsonPropertyName("degraded")]
+    public double? Degraded { get; init; }
+
+    [JsonPropertyName("outage")]
+    public double? Outage { get; init; }
+}
+
+/// <summary>One entry of the settlement time histogram.</summary>
+public sealed class SettleTimeBucket
+{
+    /// <summary>The upper bound in seconds. Null for the last entry, which holds anything slower than the bound before it.</summary>
+    [JsonPropertyName("upToSeconds")]
+    public double? UpToSeconds { get; init; }
+
+    /// <summary>Payments that settled within this bound and above the one before it.</summary>
+    [JsonPropertyName("count")]
+    public int Count { get; init; }
+}
+
+/// <summary>
+/// One time bucket of a <see cref="ServiceStatusHistoryResponse"/>. A bucket with <see cref="Samples"/> 0 was not
+/// measured, and its percentiles and gauges are null; that is different from a measured zero.
+/// </summary>
+public sealed class StatusBucket
+{
+    /// <summary>When the bucket starts.</summary>
+    [JsonPropertyName("at")]
+    public DateTimeOffset At { get; init; }
+
+    /// <summary>Measurements in the bucket, about one a minute. 0 means not measured.</summary>
+    [JsonPropertyName("samples")]
+    public int Samples { get; init; }
+
+    [JsonPropertyName("overall")]
+    public StatusBucketPart Overall { get; init; } = new();
+
+    [JsonPropertyName("sending")]
+    public StatusBucketSending Sending { get; init; } = new();
+
+    [JsonPropertyName("receiving")]
+    public StatusBucketReceiving Receiving { get; init; } = new();
+
+    [JsonPropertyName("node")]
+    public StatusBucketNode Node { get; init; } = new();
+
+    [JsonPropertyName("webhooks")]
+    public StatusBucketWebhooks Webhooks { get; init; } = new();
+}
+
+/// <summary>
+/// How many of a bucket's measurements found a part, or the service overall, degraded or in an outage.
+/// The bucket's uptime is <c>(Samples - Degraded - Outage) / Samples</c>.
+/// </summary>
+public class StatusBucketPart
+{
+    [JsonPropertyName("degraded")]
+    public int Degraded { get; init; }
+
+    [JsonPropertyName("outage")]
+    public int Outage { get; init; }
+}
+
+/// <summary>Lightning payments out, in one bucket.</summary>
+public sealed class StatusBucketSending : StatusBucketPart
+{
+    /// <summary>Payments sent.</summary>
+    [JsonPropertyName("sent")]
+    public int Sent { get; init; }
+
+    /// <summary>Payments failed, for any reason.</summary>
+    [JsonPropertyName("failed")]
+    public int Failed { get; init; }
+
+    /// <summary>Of <see cref="Failed"/>, the ones the service caused.</summary>
+    [JsonPropertyName("serviceFailures")]
+    public int ServiceFailures { get; init; }
+
+    /// <summary>Median request-to-settlement time in seconds. Null when nothing was sent.</summary>
+    [JsonPropertyName("medianSeconds")]
+    public double? MedianSeconds { get; init; }
+
+    /// <summary>95th percentile request-to-settlement time in seconds. Null when nothing was sent.</summary>
+    [JsonPropertyName("p95Seconds")]
+    public double? P95Seconds { get; init; }
+
+    /// <summary>The most payments in progress at once. Null when not measured.</summary>
+    [JsonPropertyName("maxInProgress")]
+    public int? MaxInProgress { get; init; }
+
+    /// <summary>The longest wait of a payment in progress, in seconds. Null when none was waiting or not measured.</summary>
+    [JsonPropertyName("maxWaitSeconds")]
+    public double? MaxWaitSeconds { get; init; }
+}
+
+/// <summary>Payments in, in one bucket.</summary>
+public sealed class StatusBucketReceiving : StatusBucketPart
+{
+    /// <summary>Incoming payments credited.</summary>
+    [JsonPropertyName("credited")]
+    public int Credited { get; init; }
+
+    /// <summary>The most incoming payments waiting to be credited at once. Null when not measured.</summary>
+    [JsonPropertyName("maxBacklog")]
+    public long? MaxBacklog { get; init; }
+}
+
+/// <summary>The Lightning node, in one bucket.</summary>
+public sealed class StatusBucketNode : StatusBucketPart
+{
+    /// <summary>The node's average response time in milliseconds. Null when not measured.</summary>
+    [JsonPropertyName("avgLatencyMs")]
+    public double? AvgLatencyMs { get; init; }
+
+    /// <summary>The node's slowest response time in milliseconds. Null when not measured.</summary>
+    [JsonPropertyName("maxLatencyMs")]
+    public long? MaxLatencyMs { get; init; }
+}
+
+/// <summary>Webhook delivery, in one bucket.</summary>
+public sealed class StatusBucketWebhooks : StatusBucketPart
+{
+    /// <summary>The most deliveries waiting to go out at once. Null when not measured.</summary>
+    [JsonPropertyName("maxBacklog")]
+    public long? MaxBacklog { get; init; }
+}
+
+// ---------------------------------------------------------------------------
 // Wallets
 // ---------------------------------------------------------------------------
 
@@ -178,7 +569,7 @@ public sealed class PaymentResponse
     public required long ServiceFee { get; init; }
 
     /// <summary>
-    /// Network fee actually charged in sats (Spark's fee plus Lightning routing). Null until settled.
+    /// Network fee actually charged in sats (0.25% plus Lightning routing). Null until settled.
     /// On success the wallet is debited <see cref="Amount"/> + <see cref="ActualFee"/> + <see cref="ServiceFee"/>.
     /// </summary>
     [JsonPropertyName("actualFee")]
@@ -204,6 +595,28 @@ public sealed class PaymentResponse
 
     [JsonPropertyName("settledAt")]
     public DateTimeOffset? SettledAt { get; init; }
+
+    /// <summary>
+    /// Where the payment is, more precisely than <see cref="Status"/>: one of the <see cref="PaymentStage"/> values.
+    /// More stages may be added, so for a value you don't know, fall back to <see cref="Status"/>.
+    /// Null from an API version that doesn't send it.
+    /// </summary>
+    [JsonPropertyName("stage")]
+    public string? Stage { get; init; }
+
+    /// <summary>
+    /// A sentence to show the user as is. While in progress, what is happening; once failed, the
+    /// <see cref="FailureReason"/>; once settled, null.
+    /// </summary>
+    [JsonPropertyName("statusDetail")]
+    public string? StatusDetail { get; init; }
+
+    /// <summary>
+    /// Only with <see cref="Stage"/> <c>retrying</c>: until when the payment is retried. If it still can't be sent
+    /// by then, it fails within about a minute and the funds are released. Null otherwise.
+    /// </summary>
+    [JsonPropertyName("retryUntil")]
+    public DateTimeOffset? RetryUntil { get; init; }
 }
 
 public sealed class ResolveTargetResponse
@@ -236,7 +649,7 @@ public sealed class ResolveTargetResponse
     public bool Internal { get; init; }
 
     /// <summary>
-    /// Estimated network fee in sats (Spark's 0.25% plus Lightning routing).
+    /// Estimated network fee in sats (0.25% plus Lightning routing).
     /// Null without an amount or when no estimate is available. 0 for internal transfers.
     /// </summary>
     [JsonPropertyName("networkFeeEstimate")]
@@ -499,7 +912,7 @@ public sealed class L402PayResponse
     [JsonPropertyName("amount")]
     public required long Amount { get; init; }
 
-    /// <summary>Network fee actually charged in sats (Spark's fee plus Lightning routing). Null until settled.</summary>
+    /// <summary>Network fee actually charged in sats (0.25% plus Lightning routing). Null until settled.</summary>
     [JsonPropertyName("fee")]
     public long? Fee { get; init; }
 

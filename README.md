@@ -96,7 +96,7 @@ var payment = await w.Payments.CreateAsync(new CreatePaymentRequest
 });
 ```
 
-Leave `MaxFee` unset so the server default applies (see [Payment fees](#payment-fees)). A payment can stay `pending` for a while because it is retried automatically. Retries stop when the invoice expires (failure reason `Invoice expired before it could be paid.`) or after 24 hours at most. A failing payment can also stay `processing` a few seconds before it turns `failed`. Use `w.Payments.WatchAsync(payment.Number)` or `GetAsync` to follow it.
+Leave `MaxFee` unset so the server default applies (see [Payment fees](#payment-fees)). A payment can stay `pending` for a while because it is retried automatically. Retries stop when the invoice expires (failure reason `Invoice expired before it could be paid.`) or after 24 hours at most. A failing payment can also stay `processing` a few seconds before it turns `failed`. Use `w.Payments.WatchAsync(payment.Number)` or `GetAsync` to follow it; `Stage` and `StatusDetail` say where it is (see [Payment stages](#payment-stages)).
 
 ### Check balance
 
@@ -111,7 +111,7 @@ Console.WriteLine($"{info.Available} sats available");
 
 A payment to an external wallet costs `Amount + ActualFee + ServiceFee`:
 
-- `ActualFee` is the network fee actually charged: Spark's 0.25% plus Lightning routing.
+- `ActualFee` is the network fee actually charged: 0.25% plus Lightning routing.
 - `ServiceFee` is 0.25%, minimum 1 sat.
 - Transfers to another ln.bot wallet are free.
 
@@ -183,6 +183,94 @@ An unknown ln.bot address fails with `Recipient not found.` and your own address
 
 ---
 
+## Payment stages
+
+Every payment returned by create, get and list carries `Stage`, where it is more precisely than `Status`, and `StatusDetail`, a sentence to show your user as is:
+
+```csharp
+var p = await w.Payments.GetAsync(payment.Number);
+
+switch (p.Stage)
+{
+    case PaymentStage.Retrying:
+        Console.WriteLine($"{p.StatusDetail} Retried until {p.RetryUntil:t}.");
+        break;
+    case PaymentStage.OnHold:
+        Console.WriteLine(p.StatusDetail);
+        break;
+    default:
+        // Any other stage, including one added after this SDK version: go by Status.
+        var inProgress = p.Status is PaymentStatus.Pending or PaymentStatus.Processing;
+        Console.WriteLine(inProgress ? "In progress" : p.Status.ToString());
+        break;
+}
+```
+
+| `Stage` | Constant | With `Status` | `StatusDetail` |
+|---------|----------|---------------|----------------|
+| `queued` | `PaymentStage.Queued` | `Pending` | Waiting to be sent. |
+| `retrying` | `PaymentStage.Retrying` | `Pending` | Not sent yet; retrying for a few minutes. If it still can't be sent, it fails and the funds are released. |
+| `sending` | `PaymentStage.Sending` | `Pending` or `Processing` | Being sent. Between ln.bot wallets: Being transferred to the recipient's wallet. |
+| `in_flight` | `PaymentStage.InFlight` | `Processing` | Sent; the Lightning network is completing it, usually within seconds. |
+| `confirming` | `PaymentStage.Confirming` | `Processing` | Checking with the Lightning network whether it went out. The funds stay on hold until then. |
+| `on_hold` | `PaymentStage.OnHold` | `Processing` | Interrupted by an earlier version of the service and on hold until it is reviewed. The funds are held, not lost. |
+| `settled` | `PaymentStage.Settled` | `Settled` | `null` |
+| `failed` | `PaymentStage.Failed` | `Failed` | The `FailureReason` |
+
+- `Stage` is a string, not an enum, because more stages may be added. For one you don't know, fall back to `Status`.
+- A `retrying` payment carries `RetryUntil`: if it still can't be sent by then, it fails within about a minute and the funds are released.
+- A payment can go from `Processing` back to `Pending` when it is retried, so treat both as in progress.
+- From an API version that doesn't send them, `Stage`, `StatusDetail` and `RetryUntil` are null.
+- `w.Payments.WatchAsync` events carry the same fields. Webhooks and `w.Events.StreamAsync()` don't.
+
+---
+
+## Service status
+
+Two calls report whether ln.bot is working, measured about once a minute. They are public: they need no API key and no wallet, and a key the client has is sent and does no harm.
+
+```csharp
+using LnBot;
+using LnBot.Models;
+
+using var client = new LnBotClient();
+
+var status = await client.GetStatusAsync();
+Console.WriteLine(status.Status); // operational, degraded, outage or unknown
+
+if (status.Notice is not null)
+    Console.WriteLine($"{status.Notice.Level}: {status.Notice.Message}");
+
+var sending = status.Components.Sending;
+Console.WriteLine($"{sending.InProgress} payments being sent, median {sending.MedianSeconds}s");
+foreach (var (stage, count) in sending.ByStage)
+    Console.WriteLine($"  {stage}: {count}");
+```
+
+`Components` has `Sending` (payments out), `Receiving` (payments in), `Node` (the Lightning node) and `Webhooks` (deliveries), each with its own `Status`. Over time:
+
+```csharp
+var history = await client.GetStatusHistoryAsync(StatusRange.Last7Days);
+
+Console.WriteLine($"Uptime: {history.Summary.Uptime.Overall.Operational}%");
+
+foreach (var bucket in history.Buckets)
+{
+    if (bucket.Samples == 0) continue; // not measured: no data, not down
+    var uptime = 100.0 * (bucket.Samples - bucket.Overall.Degraded - bucket.Overall.Outage) / bucket.Samples;
+    Console.WriteLine($"{bucket.At:u} {uptime:F1}%, {bucket.Sending.Sent} sent");
+}
+```
+
+- The range is `"24h"` (the default, 5-minute buckets), `"7d"` (hourly), `"30d"` (6-hourly) or `"90d"` (daily), also available as `StatusRange` constants. The API answers any other value with `BadRequestException`.
+- Buckets are aligned to UTC. Don't assume how many there are: the last one is still filling.
+- A bucket with `Samples` 0 wasn't measured, and its percentiles and gauges are null. Each part's `Degraded` and `Outage` count the bucket's measurements that found it in that state.
+- `Summary` covers the whole range: uptime in percent of measured time (null when nothing was measured), totals, and the `SettleTimes` histogram.
+- States and levels are strings, with the known values in `ServiceState` and `NoticeLevel`. More may be added, so don't fail on one you don't know.
+- Both calls share the API's limit for public routes, 10 requests a minute per IP. Over it they throw `TooManyRequestsException` (status 429). The status changes once a minute, so there is no point polling it more often.
+
+---
+
 ## Wallet-scoped API
 
 All wallet operations go through a `WalletScope` obtained via `client.Wallet(walletId)`:
@@ -210,6 +298,8 @@ Account-level operations stay on the client:
 ```csharp
 await client.RegisterAsync();          // Register new account
 await client.MeAsync();               // Get authenticated identity
+await client.GetStatusAsync();         // Service status now (public)
+await client.GetStatusHistoryAsync();  // Service status over time (public)
 await client.Wallets.CreateAsync();    // Create wallet
 await client.Wallets.ListAsync();      // List wallets
 await client.Keys.RotateAsync(0);     // Rotate account key
@@ -237,6 +327,10 @@ catch (BadRequestException ex)
 catch (ConflictException ex)
 {
     Console.WriteLine($"Conflict: {ex.Message}");
+}
+catch (TooManyRequestsException ex)
+{
+    Console.WriteLine($"Rate limited: {ex.Message}");
 }
 catch (LnBotException ex)
 {
@@ -300,7 +394,7 @@ var v = await w.L402.VerifyAsync(new VerifyL402Request
 - **Zero dependencies** — `System.Net.Http` + `System.Text.Json` only
 - **Wallet-scoped API** — `client.Wallet(id)` returns a typed scope with all sub-resources
 - **Async-first** — every method returns `Task<T>` with `CancellationToken` support
-- **Typed exceptions** — `BadRequestException`, `NotFoundException`, `ConflictException`, `UnauthorizedException`, `ForbiddenException`
+- **Typed exceptions** — `BadRequestException`, `NotFoundException`, `ConflictException`, `UnauthorizedException`, `ForbiddenException`, `TooManyRequestsException`
 - **SSE support** — `WatchAsync` returns `IAsyncEnumerable<T>` for real-time events
 - **Nullable reference types** — fully annotated
 

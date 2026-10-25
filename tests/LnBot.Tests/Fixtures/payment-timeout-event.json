@@ -1,0 +1,1 @@
+{"number":4,"status":"processing","amount":1000,"max_fee":20,"service_fee":3,"actual_fee":null,"address":"lnbc10u1p...","reference":null,"preimage":null,"tx_number":null,"failure_reason":null,"created_at":"2026-10-25T14:33:53+00:00","settled_at":null,"stage":"in_flight","status_detail":"Sent; the Lightning network is completing it, usually within seconds.","retry_until":null}

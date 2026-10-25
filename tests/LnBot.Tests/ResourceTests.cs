@@ -325,6 +325,97 @@ public class PaymentsResourceTests
         Assert.EndsWith("/v1/wallets/wal_1/payments/hash123", handler.LastRequest!.RequestUri!.AbsolutePath);
     }
 
+    // ── Stages ──
+
+    [Fact]
+    public async Task GetAsync_DecodesRetryingStage()
+    {
+        var (client, handler) = TestHelper.CreateClient();
+        handler.SetRawResponse(TestHelper.Fixture("payment-retrying.json"));
+
+        var p = await client.Wallet("wal_1").Payments.GetAsync(4);
+
+        Assert.Equal(PaymentStatus.Pending, p.Status);
+        Assert.Equal(PaymentStage.Retrying, p.Stage);
+        Assert.Equal("Not sent yet; retrying for a few minutes. If it still can't be sent, it fails and the funds are released.", p.StatusDetail);
+        Assert.Equal(new DateTimeOffset(2026, 10, 25, 14, 43, 53, TimeSpan.Zero), p.RetryUntil);
+        Assert.Equal(1000, p.Amount);
+        Assert.Equal(20, p.MaxFee);
+        Assert.Equal(3, p.ServiceFee);
+        Assert.Null(p.ActualFee);
+        Assert.Null(p.FailureReason);
+    }
+
+    [Fact]
+    public async Task GetAsync_DecodesPaymentWithoutStageFields()
+    {
+        // From an API version that doesn't send stage, statusDetail or retryUntil.
+        var (client, handler) = TestHelper.CreateClient();
+        handler.SetRawResponse(TestHelper.Fixture("payment-without-stages.json"));
+
+        var p = await client.Wallet("wal_1").Payments.GetAsync(3);
+
+        Assert.Equal(PaymentStatus.Settled, p.Status);
+        Assert.Null(p.Stage);
+        Assert.Null(p.StatusDetail);
+        Assert.Null(p.RetryUntil);
+        Assert.Equal(2, p.ActualFee);
+        Assert.Equal(12, p.TxNumber);
+        Assert.Equal(new DateTimeOffset(2026, 10, 25, 14, 30, 1, TimeSpan.Zero), p.SettledAt);
+    }
+
+    [Fact]
+    public async Task GetAsync_KeepsUnknownStage()
+    {
+        var (client, handler) = TestHelper.CreateClient();
+        handler.SetRawResponse(TestHelper.Fixture("payment-unknown-stage.json"));
+
+        var p = await client.Wallet("wal_1").Payments.GetAsync(5);
+
+        Assert.Equal("teleporting", p.Stage);
+        Assert.Equal("Moving through a new kind of route.", p.StatusDetail);
+        Assert.Null(p.RetryUntil);
+        // The status still says where it is.
+        Assert.Equal(PaymentStatus.Processing, p.Status);
+    }
+
+    [Fact]
+    public async Task CreateAsync_DecodesStageFields()
+    {
+        var (client, handler) = TestHelper.CreateClient();
+        handler.SetRawResponse(TestHelper.Fixture("payment-retrying.json"));
+
+        var p = await client.Wallet("wal_1").Payments.CreateAsync(new CreatePaymentRequest { Target = "lnbc10u1p...", Amount = 1000 });
+
+        Assert.Equal(PaymentStage.Retrying, p.Stage);
+        Assert.NotNull(p.RetryUntil);
+    }
+
+    [Fact]
+    public async Task ListAsync_DecodesMixedStageFields()
+    {
+        var (client, handler) = TestHelper.CreateClient();
+        handler.SetRawResponse($"[{TestHelper.Fixture("payment-unknown-stage.json")},{TestHelper.Fixture("payment-retrying.json")},{TestHelper.Fixture("payment-without-stages.json")}]");
+
+        var list = await client.Wallet("wal_1").Payments.ListAsync();
+
+        Assert.Equal(new string?[] { "teleporting", PaymentStage.Retrying, null }, list.Select(p => p.Stage));
+        Assert.Equal(new DateTimeOffset?[] { null, new DateTimeOffset(2026, 10, 25, 14, 43, 53, TimeSpan.Zero), null }, list.Select(p => p.RetryUntil));
+    }
+
+    [Fact]
+    public void PaymentStage_MatchesApiValues()
+    {
+        Assert.Equal("queued", PaymentStage.Queued);
+        Assert.Equal("retrying", PaymentStage.Retrying);
+        Assert.Equal("sending", PaymentStage.Sending);
+        Assert.Equal("in_flight", PaymentStage.InFlight);
+        Assert.Equal("confirming", PaymentStage.Confirming);
+        Assert.Equal("on_hold", PaymentStage.OnHold);
+        Assert.Equal("settled", PaymentStage.Settled);
+        Assert.Equal("failed", PaymentStage.Failed);
+    }
+
     private const string LightningAddressWithoutAmountJson = """
         {
           "type": "lightning_address",

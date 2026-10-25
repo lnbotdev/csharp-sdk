@@ -13,7 +13,7 @@ namespace LnBot;
 /// </summary>
 public sealed class LnBotClient : ILnBotClient
 {
-    internal const string Version = "1.1.1";
+    internal const string Version = "1.2.0";
     internal static readonly string DefaultBaseUrl = "https://api.ln.bot";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -93,6 +93,32 @@ public sealed class LnBotClient : ILnBotClient
     /// </summary>
     public Task<MeResponse> MeAsync(CancellationToken cancellationToken = default)
         => GetAsync<MeResponse>("/v1/me", cancellationToken);
+
+    /// <summary>
+    /// Returns the service's status right now: overall and per part (sending, receiving, the node, webhooks),
+    /// measured about once a minute. Public: needs no API key or wallet, and sends the key if one is set.
+    /// Shares a limit of 10 requests a minute per IP with the API's other public routes; over it, throws
+    /// <see cref="TooManyRequestsException"/>.
+    /// </summary>
+    public Task<ServiceStatusResponse> GetStatusAsync(CancellationToken cancellationToken = default)
+        => GetAsync<ServiceStatusResponse>("/v1/status", cancellationToken);
+
+    /// <summary>
+    /// Returns the service's status over time: a summary of the whole range, one bucket per interval and the
+    /// operators' notices. Public: needs no API key or wallet. Shares the status limit of 10 requests a minute
+    /// per IP; over it, throws <see cref="TooManyRequestsException"/>.
+    /// </summary>
+    /// <param name="range">
+    /// <c>24h</c> (the default, 5-minute buckets), <c>7d</c> (1-hour buckets), <c>30d</c> (6-hour buckets) or
+    /// <c>90d</c> (1-day buckets); see <see cref="StatusRange"/>. Any other value is sent as is, and the API
+    /// rejects one it doesn't support with <see cref="BadRequestException"/>.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public Task<ServiceStatusHistoryResponse> GetStatusHistoryAsync(string range = StatusRange.Last24Hours, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(range);
+        return GetAsync<ServiceStatusHistoryResponse>($"/v1/status/history?range={Uri.EscapeDataString(range)}", cancellationToken);
+    }
 
     /// <summary>
     /// Returns a wallet-scoped handle for the given wallet ID.
@@ -190,6 +216,7 @@ public sealed class LnBotClient : ILnBotClient
             403 => new ForbiddenException(message, body),
             404 => new NotFoundException(message, body),
             409 => new ConflictException(message, body),
+            429 => new TooManyRequestsException(message, body),
             _ => new LnBotException(statusCode, message, body),
         };
     }
