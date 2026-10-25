@@ -96,7 +96,7 @@ var payment = await w.Payments.CreateAsync(new CreatePaymentRequest
 });
 ```
 
-Leave `MaxFee` unset so the server default applies (see [Payment fees](#payment-fees)). A payment can stay `pending` for a while because it is retried automatically. Retries stop when the invoice expires (failure reason `Invoice expired before it could be paid.`) or after 24 hours at most. A failing payment can also stay `processing` a few seconds before it turns `failed`. Use `w.Payments.WatchAsync(payment.Number)` or `GetAsync` to follow it; `Stage` and `StatusDetail` say where it is (see [Payment stages](#payment-stages)).
+Leave `MaxFee` unset so the server default applies (see [Payment fees](#payment-fees)). A payment that can't be sent fails quickly, and its funds are released at once: within about half a minute if the Lightning service refuses it, or after 10 minutes of automatic retries for a temporary problem (`PaymentStage.Retrying`, until `RetryUntil`). If its invoice expires first, it fails with `Invoice expired before it could be paid.` A payment stays `processing` longer only when its funds are already on the Lightning network: it settles or fails as soon as the network does, usually within seconds, and is never refunded while it could still be paid. Show `FailureReason` as is; when it ends in "Please try again.", sending the payment again later can work. Use `w.Payments.WatchAsync(payment.Number)` or `GetAsync` to follow it; `Stage` and `StatusDetail` say where it is (see [Payment stages](#payment-stages)).
 
 ### Check balance
 
