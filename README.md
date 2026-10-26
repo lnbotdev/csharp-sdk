@@ -111,7 +111,7 @@ Console.WriteLine($"{info.Available} sats available");
 
 A payment to an external wallet costs `Amount + ActualFee + ServiceFee`:
 
-- `ActualFee` is the network fee actually charged: 0.25% plus Lightning routing.
+- `ActualFee` is the network fee actually charged: the Lightning routing fee.
 - `ServiceFee` is 0.25%, minimum 1 sat.
 - Transfers to another ln.bot wallet are free.
 

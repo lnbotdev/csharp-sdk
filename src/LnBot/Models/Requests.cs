@@ -62,8 +62,8 @@ public sealed class CreatePaymentRequest
     public string? IdempotencyKey { get; set; }
 
     /// <summary>
-    /// Maximum network fee in sats (the network fee is 0.25% plus Lightning routing). Leave null to use the server default
-    /// (1% of the amount, minimum 20 sats); avoid hard-coding a small value, which rejects larger payments.
+    /// Maximum network fee in sats: the Lightning routing, on top of the 0.25% service fee. Leave null to use the
+    /// server default (1% of the amount, minimum 20 sats); avoid hard-coding a small value, which rejects larger payments.
     /// Accepted range is 1 to max(10,000, 5% of the amount). Only the fee estimate plus a small buffer is held
     /// while the payment is in flight. Ignored for internal transfers.
     /// </summary>
@@ -153,7 +153,7 @@ public sealed class PayL402Request
     public required string WwwAuthenticate { get; set; }
 
     /// <summary>
-    /// Maximum network fee in sats (the network fee is 0.25% plus Lightning routing). Same default and limits as
+    /// Maximum network fee in sats: the Lightning routing, on top of the 0.25% service fee. Same default and limits as
     /// <see cref="CreatePaymentRequest.MaxFee"/>: leave null to use the server default (1% of the amount,
     /// minimum 20 sats).
     /// </summary>

@@ -569,7 +569,7 @@ public sealed class PaymentResponse
     public required long ServiceFee { get; init; }
 
     /// <summary>
-    /// Network fee actually charged in sats (0.25% plus Lightning routing). Null until settled.
+    /// Network fee actually charged in sats: the Lightning routing (the 0.25% service fee is separate). Null until settled.
     /// On success the wallet is debited <see cref="Amount"/> + <see cref="ActualFee"/> + <see cref="ServiceFee"/>.
     /// </summary>
     [JsonPropertyName("actualFee")]
@@ -649,7 +649,7 @@ public sealed class ResolveTargetResponse
     public bool Internal { get; init; }
 
     /// <summary>
-    /// Estimated network fee in sats (0.25% plus Lightning routing).
+    /// Estimated network fee in sats: the Lightning routing.
     /// Null without an amount or when no estimate is available. 0 for internal transfers.
     /// </summary>
     [JsonPropertyName("networkFeeEstimate")]
@@ -912,7 +912,7 @@ public sealed class L402PayResponse
     [JsonPropertyName("amount")]
     public required long Amount { get; init; }
 
-    /// <summary>Network fee actually charged in sats (0.25% plus Lightning routing). Null until settled.</summary>
+    /// <summary>Network fee actually charged in sats: the Lightning routing (the 0.25% service fee is separate). Null until settled.</summary>
     [JsonPropertyName("fee")]
     public long? Fee { get; init; }
 
